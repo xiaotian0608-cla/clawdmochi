@@ -6,24 +6,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
-      - name: Install Arduino CLI
+      - name: Install Arduino CLI and build
         run: |
           curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
-          echo "$HOME/bin" >> $GITHUB_PATH
-          
-      - name: Install ESP32 board
-        run: |
-          arduino-cli core update-index --config-file arduino-cli.yaml
+          export PATH=$PATH:$HOME/bin
+          arduino-cli core update-index
           arduino-cli core install esp32:esp32
-          
-      - name: Install libraries
-        run: |
           arduino-cli lib install "WebServer"
-          
-      - name: Compile
-        run: |
           arduino-cli compile --fqbn esp32:esp32:esp32s3 main/main.ino --output-dir build
           
       - name: Upload firmware
