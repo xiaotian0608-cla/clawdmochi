@@ -11,7 +11,8 @@ int threshold = 500;
 
 void handleRoot() {
   int val = analogRead(FSR_PIN);
-  String html = "<html><body>";
+  String html = "<html><head><meta charset='utf-8'></head><body>";
+;
   html += "<h1>ClawdMochi</h1>";
   html += "<p>Pressure: " + String(val) + "</p>";
   if (val > threshold) {
