@@ -14,7 +14,6 @@ jobs:
           export PATH=$PATH:$(pwd)/bin
           arduino-cli core update-index
           arduino-cli core install esp32:esp32
-          arduino-cli lib install "WebServer"
           arduino-cli compile --fqbn esp32:esp32:esp32s3 main/main.ino --output-dir build
           
       - name: Upload firmware
