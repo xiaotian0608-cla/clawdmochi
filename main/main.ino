@@ -15,7 +15,7 @@ void handleRoot() {
   html += "<h1>ClawdMochi</h1>";
   html += "<p>Pressure: " + String(val) + "</p>";
   if (val > threshold) {
-    html += "<p>✓ Hugging!</p>";
+    html += "<p>Hugging!</p>";
   } else {
     html += "<p>Waiting for hug...</p>";
   }
