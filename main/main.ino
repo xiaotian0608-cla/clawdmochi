@@ -13,11 +13,11 @@ void handleRoot() {
   int val = analogRead(FSR_PIN);
   String html = "<html><body>";
   html += "<h1>ClawdMochi</h1>";
-  html += "<p>压力值: " + String(val) + "</p>";
+  html += "<p>Pressure: " + String(val) + "</p>";
   if (val > threshold) {
-    html += "<p>✓ 被抱住了</p>";
+    html += "<p>✓ Hugging!</p>";
   } else {
-    html += "<p>等待拥抱中...</p>";
+    html += "<p>Waiting for hug...</p>";
   }
   html += "<meta http-equiv='refresh' content='2'>";
   html += "</body></html>";
