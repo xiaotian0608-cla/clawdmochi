@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TianKe</title>
+<style>
+  :root {
+    --surface-rgb: 245, 244, 237;
+    --card-rgb: 253, 252, 248;
+    --ink-rgb: 41, 37, 32;
+    --ink-soft-rgb: 128, 118, 105;
+    --border-rgb: 218, 210, 195;
+    --shadow-rgb: 120, 96, 72;
+    --accent-rgb: 217, 119, 87;
+    --accent-soft-rgb: 240, 198, 178;
+
+    --sp-1: 4px; --sp-2: 8px; --sp-2-5: 10px; --sp-3: 12px;
+    --sp-4: 16px; --sp-4-5: 20px; --sp-5: 24px;
+    --r-md: 14px; --r-lg: 18px; --r-xl: 24px; --r-pill: 999px;
+    --fs-sm: 13px; --fs-md: 15px; --fs-lg: 18px;
+    --glass-blur: 16px; --glass-saturate: 132%;
+  }
+
+  #app.theme-night {
+    --surface-rgb: 26, 24, 30; --card-rgb: 38, 35, 42;
+    --ink-rgb: 235, 230, 225; --ink-soft-rgb: 158, 150, 156;
+    --border-rgb: 70, 64, 74; --shadow-rgb: 0, 0, 0;
+    --accent-rgb: 224, 138, 108; --accent-soft-rgb: 96, 62, 48;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+    font-size: var(--fs-md);
+    color: rgb(var(--ink-rgb));
+    background: rgb(var(--surface-rgb));
+  }
+
+  #app {
+    position: relative; height: 100vh; height: 100dvh;
+    max-width: 480px; margin: 0 auto;
+    display: flex; flex-direction: column;
+    isolation: isolate; background: rgb(var(--surface-rgb));
+  }
+  #app::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image:
+      radial-gradient(ellipse at 20% -10%, rgba(var(--accent-soft-rgb), .35), transparent 55%),
+      radial-gradient(ellipse at 100% 0%, rgba(var(--accent-rgb), .12), transparent 60%);
+  }
+  #app.theme-night::before { opacity: .35; }
+
+  #app-header {
+    position: relative; isolation: isolate; z-index: 10; flex: none;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: var(--sp-3) var(--sp-4);
+  }
+  #app-header::before {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    border-bottom: 1px solid rgba(var(--border-rgb), .46);
+    background: linear-gradient(180deg, rgba(var(--surface-rgb), .86), rgba(var(--surface-rgb), .72));
+    box-shadow: 0 8px 28px rgba(var(--shadow-rgb), .08), inset 0 1px 0 rgba(var(--card-rgb), .72);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  }
+
+  .app-title { display: flex; align-items: baseline; gap: var(--sp-2); }
+  .app-title strong { font-size: var(--fs-lg); color: rgb(var(--ink-rgb)); }
+  .app-title .status-dot { color: rgb(var(--accent-rgb)); }
+  .app-title .status-text { font-size: var(--fs-sm); color: rgba(var(--ink-soft-rgb), .9); }
+  .header-controls { display: flex; align-items: center; gap: var(--sp-2); }
+
+  #theme-toggle, #settings-btn {
+    border: 1px solid rgba(var(--border-rgb), .40);
+    background: rgba(var(--card-rgb), .46);
+    border-radius: var(--r-pill);
+    padding: var(--sp-1) var(--sp-3);
+    font-size: var(--fs-sm); color: rgb(var(--ink-rgb)); cursor: pointer;
+  }
+  #settings-btn { padding: var(--sp-1) var(--sp-2-5); color: rgba(var(--ink-soft-rgb), .9); }
+
+  #chat-scroll {
+    flex: 1; min-height: 0; overflow-y: auto;
+    padding: var(--sp-4) var(--sp-4) var(--sp-2);
+    display: flex; flex-direction: column; gap: var(--sp-4);
+  }
+
+  .msg-group { display: flex; flex-direction: column; gap: var(--sp-2); max-width: 82%; }
+  .msg-group--user { align-self: flex-end; align-items: flex-end; }
+  .msg-group--ai   { align-self: flex-start; align-items: flex-start; }
+  .msg-time { font-size: 11px; color: rgba(var(--ink-soft-rgb), .8); padding: 0 var(--sp-1); }
+
+  .msg-bubble {
+    padding: var(--sp-3) var(--sp-4); border-radius: var(--r-lg);
+    line-height: 1.5; word-break: break-word; white-space: pre-wrap;
+  }
+  .msg-group--user .msg-bubble {
+    background: rgb(var(--accent-rgb)); color: #fff;
+    border-bottom-right-radius: var(--sp-1);
+  }
+  .msg-group--ai .msg-bubble {
+    position: relative; isolation: isolate;
+    border-bottom-left-radius: var(--sp-1); color: rgb(var(--ink-rgb));
+  }
+  .msg-group--ai .msg-bubble::before {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    border: 1px solid rgba(var(--card-rgb), .42); border-radius: inherit;
+    background: linear-gradient(180deg, rgba(var(--card-rgb), .60), rgba(var(--surface-rgb), .30));
+    box-shadow: 0 5px 12px rgba(var(--shadow-rgb), .08), 0 1px 3px rgba(var(--shadow-rgb), .05);
+    backdrop-filter: blur(8px) saturate(135%);
+    -webkit-backdrop-filter: blur(8px) saturate(135%);
+  }
+  .msg-group--ai.is-typing .msg-bubble { color: rgba(var(--ink-soft-rgb), .9); font-style: italic; }
+
+  #quick-actions {
+    flex: none; display: flex; gap: var(--sp-2);
+    padding: 0 var(--sp-4) var(--sp-2); overflow-x: auto;
+  }
+  .quick-chip {
+    flex: none; border: 1px solid rgba(var(--border-rgb), .40);
+    background: rgba(var(--card-rgb), .46); border-radius: var(--r-pill);
+    padding: var(--sp-1) var(--sp-3); font-size: var(--fs-sm);
+    color: rgb(var(--ink-rgb)); cursor: pointer; white-space: nowrap;
+  }
+
+  #composer-wrap { flex: none; padding: 0 var(--sp-3) var(--sp-3); }
+  #composer {
+    position: relative; isolation: isolate; display: flex;
+    align-items: flex-end; gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4); border-radius: var(--r-xl);
+  }
+  #composer::before {
+    content: ""; position: absolute; inset: 0; z-index: -1;
+    border: 1px solid rgba(var(--border-rgb), .46); border-radius: inherit;
+    background: linear-gradient(180deg, rgba(var(--surface-rgb), .86), rgba(var(--surface-rgb), .72));
+    box-shadow: 0 0 0 1px rgba(var(--card-rgb), .80),
+                0 8px 28px rgba(var(--shadow-rgb), .08),
+                inset 0 1px 0 rgba(var(--card-rgb), .72);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  }
+  #composer-input {
+    flex: 1; resize: none; border: none; background: transparent;
+    outline: none; font: inherit; color: rgb(var(--ink-rgb));
+    max-height: 120px; padding: var(--sp-1) 0;
+  }
+  #composer-input::placeholder { color: rgba(var(--ink-soft-rgb), .7); }
+  #composer-send {
+    flex: none; width: 36px; height: 36px; border-radius: var(--r-pill);
+    border: none; background: rgb(var(--accent-rgb)); color: #fff;
+    font-size: var(--fs-md); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #composer-send:disabled { opacity: .4; cursor: default; }
+
+  #splash {
+    position: absolute; inset: 0; z-index: 20;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--sp-3); background: rgb(var(--surface-rgb));
+    transition: opacity .4s ease; cursor: pointer;
+  }
+  #splash.is-hidden { opacity: 0; pointer-events: none; }
+  #splash .splash-mark { font-size: 42px; }
+  #splash .splash-name { font-size: var(--fs-lg); font-weight: 600; letter-spacing: .04em; }
+  #splash .splash-hint { font-size: var(--fs-sm); color: rgba(var(--ink-soft-rgb), .8); }
+
+  #apikey-overlay {
+    position: absolute; inset: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: center;
+    padding: var(--sp-4);
+    background: rgba(var(--surface-rgb), .7);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  }
+  .apikey-card {
+    position: relative; isolation: isolate; width: 100%; max-width: 320px;
+    padding: var(--sp-5) var(--sp-4); border-radius: var(--r-xl);
+    display: flex; flex-direction: column; gap: var(--sp-3);
+  }
+  .apikey-card::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+    border: 1px solid rgba(var(--border-rgb), .46);
+    background: linear-gradient(180deg, rgba(var(--card-rgb), .92), rgba(var(--surface-rgb), .88));
+    box-shadow: 0 16px 48px rgba(var(--shadow-rgb), .16), 0 2px 8px rgba(var(--shadow-rgb), .08);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  }
+  .apikey-title { font-size: var(--fs-lg); font-weight: 600; color: rgb(var(--ink-rgb)); }
+  .apikey-presets { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+  .apikey-preset {
+    border: 1px solid rgba(var(--border-rgb), .60);
+    background: rgba(var(--card-rgb), .60);
+    border-radius: var(--r-pill); padding: var(--sp-1) var(--sp-3);
+    font: inherit; font-size: var(--fs-sm); color: rgb(var(--ink-rgb)); cursor: pointer;
+  }
+  .apikey-preset:hover { background: rgba(var(--accent-rgb), .12); border-color: rgba(var(--accent-rgb), .40); }
+  .apikey-label {
+    display: flex; flex-direction: column; gap: var(--sp-1);
+    font-size: var(--fs-sm); color: rgba(var(--ink-soft-rgb), .9);
+  }
+  .apikey-label input {
+    width: 100%; padding: var(--sp-2-5) var(--sp-3);
+    border: 1px solid rgba(var(--border-rgb), .60);
+    border-radius: var(--r-md);
+    background: rgba(var(--card-rgb), .70); color: rgb(var(--ink-rgb));
+    font: inherit; font-size: var(--fs-sm); outline: none; box-sizing: border-box;
+  }
+  .apikey-label input:focus { border-color: rgba(var(--accent-rgb), .80); }
+  .apikey-error { font-size: var(--fs-sm); color: rgb(var(--accent-rgb)); display: none; margin: 0; }
+  .apikey-error.is-visible { display: block; }
+  #apikey-confirm {
+    padding: var(--sp-2-5) 0; border: none; border-radius: var(--r-md);
+    background: rgb(var(--accent-rgb)); color: #fff;
+    font: inherit; font-size: var(--fs-md); font-weight: 500; cursor: pointer;
+  }
+  #apikey-confirm:hover { filter: brightness(1.06); }
+
+  @media (prefers-reduced-motion: reduce) { #splash { transition: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="splash">
+    <div class="splash-mark">💠</div>
+    <div class="splash-name">TianKe</div>
+    <div class="splash-hint">Tap to skip</div>
+  </div>
+
+  <header id="app-header">
+    <div class="app-title">
+      <strong>TianKe</strong>
+      <span class="status-dot">•</span>
+      <span class="status-text" id="status-text">在线</span>
+    </div>
+    <div class="header-controls">
+      <button id="theme-toggle" type="button" aria-label="切换夜间模式">☾ / ☀</button>
+      <button id="settings-btn" type="button" aria-label="接口设置">⚙</button>
+    </div>
+  </header>
+
+  <main id="chat-scroll"></main>
+
+  <div id="quick-actions">
+    <button class="quick-chip" type="button" data-action="steps">步数</button>
+    <button class="quick-chip" type="button" data-action="location">定位</button>
+    <button class="quick-chip" type="button" data-action="photo">拍照</button>
+    <button class="quick-chip" type="button" data-action="file">文件</button>
+  </div>
+
+  <div id="composer-wrap">
+    <form id="composer">
+      <textarea id="composer-input" rows="1" placeholder="跟 TianKe 说点什么…"></textarea>
+      <button id="composer-send" type="submit" disabled aria-label="发送">➤</button>
+    </form>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const THEME_KEY   = "tianke.theme";
+  const KEY_APIKEY  = "tianke.apiKey";
+  const KEY_BASE    = "tianke.apiBase";
+  const KEY_MODEL   = "tianke.model";
+  const DEFAULT_BASE  = "https://api.deepseek.com";
+  const DEFAULT_MODEL = "deepseek-chat";
+  const SYSTEM_PROMPT = "你是 TianKe，一个温柔体贴、富有情感的 AI 助手。请用中文回复，语气自然简洁。";
+
+  const PRESETS = [
+    { label: "DeepSeek",   base: "https://api.deepseek.com",  model: "deepseek-chat" },
+    { label: "Meimaobing", base: "https://api.meimaobing.ai", model: "claude-sonnet-4-5" },
+    { label: "OpenAI",     base: "https://api.openai.com",    model: "gpt-4o-mini" },
+  ];
+
+  const app         = document.getElementById("app");
+  const splash      = document.getElementById("splash");
+  const themeToggle = document.getElementById("theme-toggle");
+  const settingsBtn = document.getElementById("settings-btn");
+  const chatScroll  = document.getElementById("chat-scroll");
+  const composer    = document.getElementById("composer");
+  const input       = document.getElementById("composer-input");
+  const sendBtn     = document.getElementById("composer-send");
+  const quickActions= document.getElementById("quick-actions");
+  const statusText  = document.getElementById("status-text");
+
+  function ls(k, fb = null)   { try { return localStorage.getItem(k) || fb; } catch { return fb; } }
+  function lsSet(k, v)        { try { localStorage.setItem(k, v); } catch {} }
+  function lsDel(k)           { try { localStorage.removeItem(k); } catch {} }
+
+  let apiKey  = ls(KEY_APIKEY);
+  let apiBase = ls(KEY_BASE, DEFAULT_BASE);
+  let model   = ls(KEY_MODEL, DEFAULT_MODEL);
+  let isFetching = false;
+  const conversationHistory = [];
+
+  function applyTheme(t) { app.classList.toggle("theme-night", t === "night"); }
+  try { applyTheme(ls(THEME_KEY)); } catch {}
+  themeToggle.addEventListener("click", () => {
+    const next = app.classList.contains("theme-night") ? "light" : "night";
+    applyTheme(next); lsSet(THEME_KEY, next);
+  });
+
+  function dismissSplash() { splash.classList.add("is-hidden"); }
+  splash.addEventListener("click", dismissSplash);
+  setTimeout(dismissSplash, 1200);
+
+  function showApiKeyPrompt() {
+    document.getElementById("apikey-overlay")?.remove();
+    const overlay = document.createElement("div");
+    overlay.id = "apikey-overlay";
+    overlay.innerHTML = `
+      <div class="apikey-card">
+        <div class="apikey-title">接口设置</div>
+        <div class="apikey-presets" id="apikey-presets">
+          ${PRESETS.map((p,i) => `<button class="apikey-preset" type="button" data-idx="${i}">${p.label}</button>`).join("")}
+        </div>
+        <label class="apikey-label">接口地址
+          <input id="apikey-base" type="url" placeholder="https://api.deepseek.com" autocomplete="off" />
+        </label>
+        <label class="apikey-label">API Key
+          <input id="apikey-input" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="apikey-label">模型
+          <input id="apikey-model" type="text" placeholder="deepseek-chat" autocomplete="off" />
+        </label>
+        <p class="apikey-error" id="apikey-error">请填写接口地址和 Key。</p>
+        <button id="apikey-confirm" type="button">确认</button>
+      </div>`;
+    app.appendChild(overlay);
+
+    const baseInput  = overlay.querySelector("#apikey-base");
+    const keyInput   = overlay.querySelector("#apikey-input");
+    const modelInput = overlay.querySelector("#apikey-model");
+    const confirmBtn = overlay.querySelector("#apikey-confirm");
+    const errorMsg   = overlay.querySelector("#apikey-error");
+
+    baseInput.value  = apiBase;
+    if (apiKey) keyInput.value = apiKey;
+    modelInput.value = model;
+
+    overlay.querySelector("#apikey-presets").addEventListener("click", (e) => {
+      const btn = e.target.closest(".apikey-preset");
+      if (!btn) return;
+      const p = PRESETS[+btn.dataset.idx];
+      baseInput.value = p.base; modelInput.value = p.model; keyInput.focus();
+    });
+
+    [baseInput, keyInput, modelInput].forEach(el =>
+      el.addEventListener("input", () => errorMsg.classList.remove("is-visible"))
+    );
+
+    function confirm() {
+      const base = baseInput.value.trim().replace(/\/$/, "");
+      const key  = keyInput.value.trim();
+      const mdl  = modelInput.value.trim() || DEFAULT_MODEL;
+      if (!base || !key) { errorMsg.classList.add("is-visible"); return; }
+      apiBase = base; apiKey = key; model = mdl;
+      lsSet(KEY_BASE, base); lsSet(KEY_APIKEY, key); lsSet(KEY_MODEL, mdl);
+      overlay.remove();
+    }
+    confirmBtn.addEventListener("click", confirm);
+    [baseInput, keyInput, modelInput].forEach(el =>
+      el.addEventListener("keydown", (e) => { if (e.key === "Enter") confirm(); })
+    );
+    setTimeout(() => (apiKey ? keyInput : baseInput).focus(), 50);
+  }
+
+  settingsBtn.addEventListener("click", showApiKeyPrompt);
+  if (!apiKey) setTimeout(showApiKeyPrompt, 1300);
+
+  function timeLabel(d) {
+    const p = n => String(n).padStart(2, "0");
+    return `${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+  function appendMessage({ role, text }) {
+    const g = document.createElement("div");
+    g.className = `msg-group msg-group--${role}`;
+    const t = document.createElement("div"); t.className = "msg-time";
+    t.textContent = `• ${timeLabel(new Date())}`;
+    const b = document.createElement("div"); b.className = "msg-bubble";
+    b.textContent = text;
+    g.appendChild(t); g.appendChild(b);
+    chatScroll.appendChild(g);
+    chatScroll.scrollTop = chatScroll.scrollHeight;
+    return g;
+  }
+  function appendTyping() {
+    const g = appendMessage({ role: "ai", text: "…" });
+    g.classList.add("is-typing"); return g;
+  }
+
+  async function callAI(userText) {
+    if (!apiKey) { showApiKeyPrompt(); return; }
+    isFetching = true; sendBtn.disabled = true; statusText.textContent = "回复中…";
+    conversationHistory.push({ role: "user", content: userText });
+    const typingGroup = appendTyping();
+    const bubble = typingGroup.querySelector(".msg-bubble");
+    let accumulated = "";
+
+    try {
+      const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...conversationHistory];
+      const resp = await fetch(`${apiBase}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model, max_tokens: 1024, messages }),
+      });
+
+      if (!resp.ok) {
+        let e = `HTTP ${resp.status}`;
+        try { const b = await resp.json(); e = b.error?.message ?? e; } catch {}
+        throw new Error(e);
+      }
+
+      const data = await resp.json();
+      accumulated = data.choices?.[0]?.message?.content ?? "（无回复）";
+      typingGroup.classList.remove("is-typing");
+      bubble.textContent = accumulated;
+      conversationHistory.push({ role: "assistant", content: accumulated });
+
+    } catch (err) {
+      typingGroup.remove(); conversationHistory.pop();
+      const msg = err.message ?? "";
+      const isAuth = msg.includes("401") || msg.toLowerCase().includes("api key") || msg.toLowerCase().includes("authentication");
+      appendMessage({ role: "ai", text: `❌ ${isAuth ? "Key 无效，请重新设置。" : `出错：${msg}`}` });
+      if (isAuth) { lsDel(KEY_APIKEY); apiKey = null; setTimeout(showApiKeyPrompt, 500); }
+    } finally {
+      isFetching = false; statusText.textContent = "在线";
+      sendBtn.disabled = input.value.trim().length === 0;
+    }
+  }
+
+  function sendCurrentInput() {
+    const text = input.value.trim();
+    if (!text || isFetching) return;
+    appendMessage({ role: "user", text });
+    input.value = ""; autoResize(); callAI(text);
+  }
+  composer.addEventListener("submit", (e) => { e.preventDefault(); sendCurrentInput(); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendCurrentInput(); }
+  });
+  function autoResize() {
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
+    sendBtn.disabled = input.value.trim().length === 0;
+  }
+  input.addEventListener("input", autoResize);
+
+  quickActions.addEventListener("click", (e) => {
+    const chip = e.target.closest(".quick-chip");
+    if (!chip || isFetching) return;
+    const labels = { steps: "上报步数", location: "上报定位", photo: "拍照", file: "发送文件" };
+    const text = labels[chip.dataset.action] ?? chip.textContent;
+    appendMessage({ role: "user", text }); callAI(text);
+  });
+
+  appendMessage({ role: "ai", text: "TianKe 已上线，随时可以聊。" });
+  statusText.textContent = "在线";
+})();
+</script>
+</body>
+</html>
