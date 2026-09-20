@@ -336,6 +336,35 @@ body {
   font-weight: 600;
 }
 
+.apikey-presets {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.apikey-preset {
+  border: 1px solid rgba(var(--border-rgb), .60);
+  background: rgba(var(--card-rgb), .60);
+  border-radius: var(--r-pill);
+  padding: var(--sp-1) var(--sp-3);
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: rgb(var(--ink-rgb));
+  cursor: pointer;
+}
+.apikey-preset:hover {
+  background: rgba(var(--accent-rgb), .12);
+  border-color: rgba(var(--accent-rgb), .40);
+}
+
+.apikey-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: var(--fs-sm);
+  color: rgba(var(--ink-soft-rgb), .9);
+}
+
 .apikey-hint {
   margin: 0;
   font-size: var(--fs-sm);

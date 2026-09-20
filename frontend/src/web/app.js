@@ -1,53 +1,67 @@
 (() => {
   "use strict";
 
-  const THEME_KEY = "tianke.theme";
-  const API_KEY_KEY = "tianke.apiKey";
-  const MODEL = "claude-sonnet-4-6";
+  const THEME_KEY   = "tianke.theme";
+  const KEY_APIKEY  = "tianke.apiKey";
+  const KEY_BASE    = "tianke.apiBase";
+  const KEY_MODEL   = "tianke.model";
+
+  const DEFAULT_BASE  = "https://api.deepseek.com";
+  const DEFAULT_MODEL = "deepseek-chat";
   const SYSTEM_PROMPT = "你是 TianKe，一个温柔体贴、富有情感的 AI 助手。请用中文回复，语气自然简洁。";
 
-  const root = document.documentElement;
-  const app = document.getElementById("app");
-  const splash = document.getElementById("splash");
+  const root        = document.documentElement;
+  const app         = document.getElementById("app");
+  const splash      = document.getElementById("splash");
   const themeToggle = document.getElementById("theme-toggle");
   const settingsBtn = document.getElementById("settings-btn");
-  const chatScroll = document.getElementById("chat-scroll");
-  const composer = document.getElementById("composer");
-  const input = document.getElementById("composer-input");
-  const sendBtn = document.getElementById("composer-send");
-  const quickActions = document.getElementById("quick-actions");
-  const statusText = document.getElementById("status-text");
+  const chatScroll  = document.getElementById("chat-scroll");
+  const composer    = document.getElementById("composer");
+  const input       = document.getElementById("composer-input");
+  const sendBtn     = document.getElementById("composer-send");
+  const quickActions= document.getElementById("quick-actions");
+  const statusText  = document.getElementById("status-text");
 
-  let apiKey = localStorage.getItem(API_KEY_KEY);
+  function ls(key, fallback = null) {
+    try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+  }
+  function lsSet(key, val) {
+    try { localStorage.setItem(key, val); } catch {}
+  }
+  function lsDel(key) {
+    try { localStorage.removeItem(key); } catch {}
+  }
+
+  let apiKey  = ls(KEY_APIKEY);
+  let apiBase = ls(KEY_BASE, DEFAULT_BASE);
+  let model   = ls(KEY_MODEL, DEFAULT_MODEL);
   let isFetching = false;
   const conversationHistory = [];
 
   // ---------- 主题 ----------
-  function applyTheme(theme) {
-    if (theme === "night") {
-      root.setAttribute("data-theme", "night");
-    } else {
-      root.removeAttribute("data-theme");
-    }
+  function applyTheme(t) {
+    if (t === "night") root.setAttribute("data-theme", "night");
+    else root.removeAttribute("data-theme");
   }
-
-  function toggleTheme() {
+  applyTheme(ls(THEME_KEY));
+  themeToggle.addEventListener("click", () => {
     const next = root.getAttribute("data-theme") === "night" ? "light" : "night";
     applyTheme(next);
-    localStorage.setItem(THEME_KEY, next);
-  }
-
-  applyTheme(localStorage.getItem(THEME_KEY));
-  themeToggle.addEventListener("click", toggleTheme);
+    lsSet(THEME_KEY, next);
+  });
 
   // ---------- 开屏 ----------
-  function dismissSplash() {
-    splash.classList.add("is-hidden");
-  }
+  function dismissSplash() { splash.classList.add("is-hidden"); }
   splash.addEventListener("click", dismissSplash);
   setTimeout(dismissSplash, 1200);
 
-  // ---------- API Key 浮层 ----------
+  // ---------- 设置浮层 ----------
+  const PRESETS = [
+    { label: "DeepSeek",   base: "https://api.deepseek.com",   model: "deepseek-chat" },
+    { label: "Meimaobing", base: "https://api.meimaobing.ai",  model: "claude-sonnet-4-5" },
+    { label: "OpenAI",     base: "https://api.openai.com",     model: "gpt-4o-mini" },
+  ];
+
   function showApiKeyPrompt() {
     document.getElementById("apikey-overlay")?.remove();
 
@@ -55,68 +69,83 @@
     overlay.id = "apikey-overlay";
     overlay.innerHTML = `
       <div class="apikey-card">
-        <div class="apikey-title">设置 API Key</div>
-        <p class="apikey-hint">需要 Anthropic API Key 才能开始对话。Key 仅存储在本设备的浏览器中，不会上传。</p>
-        <input id="apikey-input" type="password" placeholder="sk-ant-api03-…" autocomplete="off" spellcheck="false" />
-        <p class="apikey-error" id="apikey-error">Key 不能为空，请输入后确认。</p>
+        <div class="apikey-title">接口设置</div>
+        <div class="apikey-presets" id="apikey-presets">
+          ${PRESETS.map((p, i) => `<button class="apikey-preset" type="button" data-idx="${i}">${p.label}</button>`).join("")}
+        </div>
+        <label class="apikey-label">接口地址
+          <input id="apikey-base" type="url" placeholder="https://api.deepseek.com" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="apikey-label">API Key
+          <input id="apikey-input" type="password" placeholder="sk-…" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="apikey-label">模型
+          <input id="apikey-model" type="text" placeholder="deepseek-chat" autocomplete="off" spellcheck="false" />
+        </label>
+        <p class="apikey-error" id="apikey-error">请填写接口地址和 Key。</p>
         <button id="apikey-confirm" type="button">确认</button>
       </div>
     `;
     app.appendChild(overlay);
 
-    const keyInput = document.getElementById("apikey-input");
-    const confirmBtn = document.getElementById("apikey-confirm");
-    const errorMsg = document.getElementById("apikey-error");
+    const baseInput  = overlay.querySelector("#apikey-base");
+    const keyInput   = overlay.querySelector("#apikey-input");
+    const modelInput = overlay.querySelector("#apikey-model");
+    const confirmBtn = overlay.querySelector("#apikey-confirm");
+    const errorMsg   = overlay.querySelector("#apikey-error");
 
+    baseInput.value  = apiBase;
     if (apiKey) keyInput.value = apiKey;
+    modelInput.value = model;
 
-    keyInput.addEventListener("input", () => {
-      errorMsg.classList.remove("is-visible");
+    overlay.querySelector("#apikey-presets").addEventListener("click", (e) => {
+      const btn = e.target.closest(".apikey-preset");
+      if (!btn) return;
+      const p = PRESETS[+btn.dataset.idx];
+      baseInput.value  = p.base;
+      modelInput.value = p.model;
+      keyInput.focus();
     });
 
+    [baseInput, keyInput, modelInput].forEach(el =>
+      el.addEventListener("input", () => errorMsg.classList.remove("is-visible"))
+    );
+
     function confirm() {
-      const key = keyInput.value.trim();
-      if (!key) {
-        errorMsg.classList.add("is-visible");
-        return;
-      }
-      apiKey = key;
-      localStorage.setItem(API_KEY_KEY, key);
+      const base = baseInput.value.trim().replace(/\/$/, "");
+      const key  = keyInput.value.trim();
+      const mdl  = modelInput.value.trim() || DEFAULT_MODEL;
+      if (!base || !key) { errorMsg.classList.add("is-visible"); return; }
+      apiBase = base; apiKey = key; model = mdl;
+      lsSet(KEY_BASE, base); lsSet(KEY_APIKEY, key); lsSet(KEY_MODEL, mdl);
       overlay.remove();
     }
 
     confirmBtn.addEventListener("click", confirm);
-    keyInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") confirm();
-    });
-
-    setTimeout(() => keyInput.focus(), 50);
+    [baseInput, keyInput, modelInput].forEach(el =>
+      el.addEventListener("keydown", (e) => { if (e.key === "Enter") confirm(); })
+    );
+    setTimeout(() => (apiKey ? keyInput : baseInput).focus(), 50);
   }
 
   settingsBtn.addEventListener("click", showApiKeyPrompt);
-
-  if (!apiKey) {
-    setTimeout(showApiKeyPrompt, 1300);
-  }
+  if (!apiKey) setTimeout(showApiKeyPrompt, 1300);
 
   // ---------- 消息渲染 ----------
   function timeLabel(date) {
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    const pad = n => String(n).padStart(2, "0");
+    return `${pad(date.getMonth()+1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
   }
 
-  function appendMessage({ role, text, time = new Date() }) {
-    const group = document.createElement("div");
+  function appendMessage({ role, text }) {
+    const group  = document.createElement("div");
     group.className = `msg-group msg-group--${role}`;
-
     const timeEl = document.createElement("div");
     timeEl.className = "msg-time";
-    timeEl.textContent = `• ${timeLabel(time)}`;
-
+    timeEl.textContent = `• ${timeLabel(new Date())}`;
     const bubble = document.createElement("div");
     bubble.className = "msg-bubble";
     bubble.textContent = text;
-
     group.appendChild(timeEl);
     group.appendChild(bubble);
     chatScroll.appendChild(group);
@@ -125,17 +154,14 @@
   }
 
   function appendTyping() {
-    const group = appendMessage({ role: "ai", text: "…" });
-    group.classList.add("is-typing");
-    return group;
+    const g = appendMessage({ role: "ai", text: "…" });
+    g.classList.add("is-typing");
+    return g;
   }
 
-  // ---------- Claude API (SSE 流式) ----------
-  async function callClaude(userText) {
-    if (!apiKey) {
-      showApiKeyPrompt();
-      return;
-    }
+  // ---------- AI 调用 (OpenAI 兼容 SSE) ----------
+  async function callAI(userText) {
+    if (!apiKey) { showApiKeyPrompt(); return; }
 
     isFetching = true;
     sendBtn.disabled = true;
@@ -147,33 +173,27 @@
     let accumulated = "";
 
     try {
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      const messages = [
+        { role: "system", content: SYSTEM_PROMPT },
+        ...conversationHistory,
+      ];
+
+      const resp = await fetch(`${apiBase}/v1/chat/completions`, {
         method: "POST",
         headers: {
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json",
-          "anthropic-dangerous-direct-browser-access": "true",
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 1024,
-          system: SYSTEM_PROMPT,
-          messages: conversationHistory,
-          stream: true,
-        }),
+        body: JSON.stringify({ model, max_tokens: 1024, messages, stream: true }),
       });
 
       if (!resp.ok) {
         let errMsg = `HTTP ${resp.status}`;
-        try {
-          const body = await resp.json();
-          errMsg = body.error?.message ?? errMsg;
-        } catch {}
+        try { const b = await resp.json(); errMsg = b.error?.message ?? errMsg; } catch {}
         throw new Error(errMsg);
       }
 
-      const reader = resp.body.getReader();
+      const reader  = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
 
@@ -181,18 +201,17 @@
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
-
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const payload = line.slice(6).trim();
           if (payload === "[DONE]") break outer;
           try {
-            const evt = JSON.parse(payload);
-            if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
-              accumulated += evt.delta.text;
+            const evt  = JSON.parse(payload);
+            const text = evt.choices?.[0]?.delta?.content;
+            if (text) {
+              accumulated += text;
               typingGroup.classList.remove("is-typing");
               bubble.textContent = accumulated;
               chatScroll.scrollTop = chatScroll.scrollHeight;
@@ -210,13 +229,9 @@
       typingGroup.remove();
       conversationHistory.pop();
       const msg = err.message ?? "";
-      const isAuthErr = msg.includes("401") || msg.toLowerCase().includes("api key") || msg.toLowerCase().includes("authentication");
-      appendMessage({ role: "ai", text: `❌ ${isAuthErr ? "API Key 无效，请重新设置。" : `出错：${msg}`}` });
-      if (isAuthErr) {
-        localStorage.removeItem(API_KEY_KEY);
-        apiKey = null;
-        setTimeout(showApiKeyPrompt, 500);
-      }
+      const isAuth = msg.includes("401") || msg.toLowerCase().includes("api key") || msg.toLowerCase().includes("authentication");
+      appendMessage({ role: "ai", text: `❌ ${isAuth ? "Key 无效，请重新设置。" : `出错：${msg}`}` });
+      if (isAuth) { lsDel(KEY_APIKEY); apiKey = null; setTimeout(showApiKeyPrompt, 500); }
     } finally {
       isFetching = false;
       statusText.textContent = "在线";
@@ -224,26 +239,19 @@
     }
   }
 
-  // ---------- 发送逻辑 ----------
+  // ---------- 发送 ----------
   function sendCurrentInput() {
     const text = input.value.trim();
     if (!text || isFetching) return;
     appendMessage({ role: "user", text });
     input.value = "";
     autoResize();
-    callClaude(text);
+    callAI(text);
   }
 
-  composer.addEventListener("submit", (e) => {
-    e.preventDefault();
-    sendCurrentInput();
-  });
-
+  composer.addEventListener("submit", (e) => { e.preventDefault(); sendCurrentInput(); });
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendCurrentInput();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendCurrentInput(); }
   });
 
   function autoResize() {
@@ -251,25 +259,18 @@
     input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
     sendBtn.disabled = input.value.trim().length === 0;
   }
-
   input.addEventListener("input", autoResize);
 
   // ---------- 快捷指令 ----------
   quickActions.addEventListener("click", (e) => {
     const chip = e.target.closest(".quick-chip");
     if (!chip || isFetching) return;
-    const labels = {
-      steps: "上报步数",
-      location: "上报定位",
-      photo: "拍照",
-      file: "发送文件",
-    };
+    const labels = { steps: "上报步数", location: "上报定位", photo: "拍照", file: "发送文件" };
     const text = labels[chip.dataset.action] ?? chip.textContent;
     appendMessage({ role: "user", text });
-    callClaude(text);
+    callAI(text);
   });
 
-  // ---------- 初始欢迎消息 ----------
   appendMessage({ role: "ai", text: "TianKe 已上线，随时可以聊。" });
   statusText.textContent = "在线";
 })();
