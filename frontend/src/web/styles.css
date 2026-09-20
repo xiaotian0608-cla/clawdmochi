@@ -291,3 +291,109 @@ body {
   opacity: .4;
   cursor: default;
 }
+
+/* ================= API Key 设置浮层 ================= */
+#apikey-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+  background: rgba(var(--surface-rgb), .7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.apikey-card {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  max-width: 320px;
+  padding: var(--sp-5) var(--sp-4);
+  border-radius: var(--r-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.apikey-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  border: 1px solid rgba(var(--border-rgb), .46);
+  background: linear-gradient(180deg, rgba(var(--card-rgb), .92), rgba(var(--surface-rgb), .88));
+  box-shadow: 0 16px 48px rgba(var(--shadow-rgb), .16), 0 2px 8px rgba(var(--shadow-rgb), .08);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.apikey-title {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.apikey-hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: rgba(var(--ink-soft-rgb), .9);
+  line-height: 1.6;
+}
+
+.apikey-error {
+  font-size: var(--fs-sm);
+  color: rgb(var(--accent-rgb));
+  display: none;
+}
+
+.apikey-error.is-visible {
+  display: block;
+}
+
+#apikey-input {
+  width: 100%;
+  padding: var(--sp-2-5) var(--sp-3);
+  border: 1px solid rgba(var(--border-rgb), .60);
+  border-radius: var(--r-md);
+  background: rgba(var(--card-rgb), .70);
+  color: rgb(var(--ink-rgb));
+  font: inherit;
+  font-size: var(--fs-sm);
+  outline: none;
+  box-sizing: border-box;
+}
+
+#apikey-input:focus {
+  border-color: rgba(var(--accent-rgb), .80);
+}
+
+#apikey-confirm {
+  padding: var(--sp-2-5) 0;
+  border: none;
+  border-radius: var(--r-md);
+  background: rgb(var(--accent-rgb));
+  color: #fff;
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+#apikey-confirm:hover {
+  filter: brightness(1.06);
+}
+
+#settings-btn {
+  border: none;
+  background: var(--glass-chip-fill);
+  border: 1px solid var(--glass-chip-border);
+  border-radius: var(--r-pill);
+  padding: var(--sp-1) var(--sp-2-5);
+  font-size: var(--fs-sm);
+  color: rgba(var(--ink-soft-rgb), .9);
+  cursor: pointer;
+  margin-left: var(--sp-2);
+}
