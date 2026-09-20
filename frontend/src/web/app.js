@@ -184,7 +184,7 @@
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ model, max_tokens: 1024, messages, stream: true }),
+        body: JSON.stringify({ model, max_tokens: 1024, messages }),
       });
 
       if (!resp.ok) {
@@ -193,34 +193,8 @@
         throw new Error(errMsg);
       }
 
-      const reader  = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      outer: while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const payload = line.slice(6).trim();
-          if (payload === "[DONE]") break outer;
-          try {
-            const evt  = JSON.parse(payload);
-            const text = evt.choices?.[0]?.delta?.content;
-            if (text) {
-              accumulated += text;
-              typingGroup.classList.remove("is-typing");
-              bubble.textContent = accumulated;
-              chatScroll.scrollTop = chatScroll.scrollHeight;
-            }
-          } catch {}
-        }
-      }
-
-      if (!accumulated) accumulated = "（无回复）";
+      const data = await resp.json();
+      accumulated = data.choices?.[0]?.message?.content ?? "（无回复）";
       typingGroup.classList.remove("is-typing");
       bubble.textContent = accumulated;
       conversationHistory.push({ role: "assistant", content: accumulated });
