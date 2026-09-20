@@ -1,0 +1,293 @@
+@import url("../../docs/design/tokens.css");
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  font-size: var(--fs-md);
+  color: rgb(var(--ink-rgb));
+  background: rgb(var(--surface-rgb));
+  overflow: hidden;
+}
+
+#app {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+}
+
+/* 背景层：挂在 #app 上，不随消息滚动。真实资源就绪前先用渐变占位，
+   直接把 background-image 换成图片地址即可。 */
+#app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(ellipse at 20% -10%, rgba(var(--accent-soft-rgb), .35), transparent 55%),
+    radial-gradient(ellipse at 100% 0%, rgba(var(--accent-rgb), .12), transparent 60%);
+  background-size: cover;
+  background-position: center;
+}
+
+/* night 主题下这张暖色底图必须藏起来，避免和深色底冲突 */
+:root[data-theme="night"] #app::before {
+  opacity: .35;
+}
+
+/* ================= 开屏 ================= */
+#splash {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  background: rgb(var(--surface-rgb));
+  transition: opacity .4s ease;
+}
+
+#splash.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#splash .splash-mark {
+  font-size: 42px;
+}
+
+#splash .splash-name {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+
+#splash .splash-hint {
+  font-size: var(--fs-sm);
+  color: rgba(var(--ink-soft-rgb), .8);
+}
+
+/* ================= 顶部栏 (玻璃) ================= */
+#app-header {
+  position: relative;
+  isolation: isolate;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: max(var(--sp-3), env(safe-area-inset-top)) var(--sp-4) var(--sp-3);
+}
+
+#app-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-bottom: 1px solid var(--glass-header-border);
+  background: var(--glass-header-fill);
+  box-shadow: var(--glass-header-shadow);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.app-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+}
+
+.app-title strong {
+  font-size: var(--fs-lg);
+}
+
+.app-title .status-dot {
+  color: rgb(var(--accent-rgb));
+}
+
+.app-title .status-text {
+  font-size: var(--fs-sm);
+  color: rgba(var(--ink-soft-rgb), .9);
+}
+
+#theme-toggle {
+  border: none;
+  background: var(--glass-chip-fill);
+  border: 1px solid var(--glass-chip-border);
+  border-radius: var(--r-pill);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+  color: rgb(var(--ink-rgb));
+  cursor: pointer;
+}
+
+/* ================= 消息区 ================= */
+#chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-4) var(--sp-4) var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.msg-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-width: 78%;
+}
+
+.msg-group--user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.msg-group--ai {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.msg-time {
+  font-size: 11px;
+  color: rgba(var(--ink-soft-rgb), .8);
+  padding: 0 var(--sp-1);
+}
+
+.msg-bubble {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.msg-group--user .msg-bubble {
+  background: rgb(var(--accent-rgb));
+  color: #fff;
+  border-bottom-right-radius: var(--sp-1);
+}
+
+/* AI 气泡走玻璃卡片配方，独立 ::before 背景层 + isolation */
+.msg-group--ai .msg-bubble {
+  position: relative;
+  isolation: isolate;
+  border-bottom-left-radius: var(--sp-1);
+  color: rgb(var(--ink-rgb));
+}
+
+.msg-group--ai .msg-bubble::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--glass-card-border);
+  border-radius: inherit;
+  background: var(--glass-card-fill);
+  box-shadow: var(--glass-card-shadow);
+  backdrop-filter: blur(8px) saturate(135%);
+  -webkit-backdrop-filter: blur(8px) saturate(135%);
+}
+
+.msg-group--ai.is-typing .msg-bubble {
+  color: rgba(var(--ink-soft-rgb), .9);
+  font-style: italic;
+}
+
+/* ================= 快捷指令条 ================= */
+#quick-actions {
+  display: flex;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-4) var(--sp-2);
+  overflow-x: auto;
+}
+
+.quick-chip {
+  flex: none;
+  border: 1px solid var(--glass-chip-border);
+  background: var(--glass-chip-fill);
+  border-radius: var(--r-pill);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+  color: rgb(var(--ink-rgb));
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ================= 输入区 (玻璃 composer) ================= */
+#composer-wrap {
+  padding: 0 var(--sp-3) max(var(--sp-3), env(safe-area-inset-bottom));
+}
+
+#composer {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+  border-radius: var(--r-xl);
+}
+
+/* 玻璃只画在独立背景层，textarea 不再和 backdrop-filter 共用合成层，
+   降低 iOS 光标在键盘换帧期间沿用旧坐标的机会。 */
+#composer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 1px solid var(--glass-composer-border);
+  border-radius: inherit;
+  background: var(--glass-composer-fill);
+  box-shadow: var(--glass-composer-shadow);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+#composer-input {
+  flex: 1;
+  resize: none;
+  border: none;
+  background: transparent;
+  outline: none;
+  font: inherit;
+  color: rgb(var(--ink-rgb));
+  max-height: 120px;
+  padding: var(--sp-1) 0;
+}
+
+#composer-input::placeholder {
+  color: rgba(var(--ink-soft-rgb), .7);
+}
+
+#composer-send {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-pill);
+  border: none;
+  background: rgb(var(--accent-rgb));
+  color: #fff;
+  font-size: var(--fs-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#composer-send:disabled {
+  opacity: .4;
+  cursor: default;
+}

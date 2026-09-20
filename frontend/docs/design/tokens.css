@@ -1,0 +1,86 @@
+/*
+ * TianKe 专属前端 · 设计变量 (Design Tokens)
+ *
+ * 液态玻璃(Glass)材质写法参考自小克Cat 专属前端:
+ *   - 玻璃永远画在独立的 ::before/::after 背景层上，不与承载真实内容
+ *     (尤其是 textarea 等可交互元素) 的那一层共用合成层。
+ *   - 容器本身加 isolation: isolate 建立新的合成层。
+ *   - 视觉配方固定三件套: 半透明渐变背景 + 内外描边高光
+ *     (box-shadow 的 0 0 0 1px 与 inset 0 1px 0) + backdrop-filter(blur + saturate)。
+ *   - saturate 值取 116%~145% 之间，让透过玻璃看到的底色更鲜活。
+ */
+
+:root {
+  /* ---- 基础色板 (RGB 三元组，配合 rgba() 做透明度叠加) ---- */
+  --surface-rgb: 250, 246, 240;   /* 暖白背景 */
+  --card-rgb: 255, 255, 255;      /* 卡片/气泡底色 */
+  --ink-rgb: 43, 36, 33;          /* 正文文字 */
+  --ink-soft-rgb: 120, 108, 100;  /* 次要文字 */
+  --border-rgb: 214, 200, 186;    /* 描边 */
+  --shadow-rgb: 120, 96, 72;      /* 投影底色 */
+  --accent-rgb: 224, 122, 95;     /* 珊瑚橙主色，呼应小红书截图里的心形图标 */
+  --accent-soft-rgb: 247, 205, 190;
+
+  /* ---- 间距 / 圆角 / 字号 ---- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-2-5: 10px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-4-5: 20px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  --fs-sm: 13px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+
+  /* ---- 玻璃基础强度，全局唯一 ---- */
+  --glass-blur: 16px;
+  --glass-saturate: 132%;
+
+  /* ---- 分场景的玻璃 token: --glass-场景名-用途 ---- */
+  --glass-header-fill: linear-gradient(180deg, rgba(var(--surface-rgb), .86), rgba(var(--surface-rgb), .72));
+  --glass-header-border: rgba(var(--border-rgb), .46);
+  --glass-header-shadow: 0 8px 28px rgba(var(--shadow-rgb), .08), inset 0 1px 0 rgba(var(--card-rgb), .72);
+
+  --glass-composer-fill: linear-gradient(180deg, rgba(var(--surface-rgb), .86), rgba(var(--surface-rgb), .72));
+  --glass-composer-border: rgba(var(--border-rgb), .46);
+  --glass-composer-shadow: 0 0 0 1px rgba(var(--card-rgb), .80),
+                           0 8px 28px rgba(var(--shadow-rgb), .08),
+                           inset 0 1px 0 rgba(var(--card-rgb), .72);
+
+  --glass-card-fill: linear-gradient(180deg, rgba(var(--card-rgb), .60), rgba(var(--surface-rgb), .30));
+  --glass-card-border: rgba(var(--card-rgb), .42);
+  --glass-card-shadow: 0 5px 12px rgba(var(--shadow-rgb), .08), 0 1px 3px rgba(var(--shadow-rgb), .05);
+
+  --glass-chip-fill: rgba(var(--card-rgb), .46);
+  --glass-chip-border: rgba(var(--border-rgb), .40);
+
+  --glass-scrim: rgba(var(--shadow-rgb), .16);
+
+  /* 顶部安全区偏移，聊天头部随刘海屏适配 */
+  --glass-chat-top: calc(max(var(--sp-4-5), env(safe-area-inset-top)) + 42px + var(--sp-2-5));
+}
+
+/* ---- night 主题: 反转基础色板，玻璃配方保持不变 ---- */
+:root[data-theme="night"] {
+  --surface-rgb: 26, 24, 30;
+  --card-rgb: 38, 35, 42;
+  --ink-rgb: 235, 230, 225;
+  --ink-soft-rgb: 158, 150, 156;
+  --border-rgb: 70, 64, 74;
+  --shadow-rgb: 0, 0, 0;
+  --accent-rgb: 230, 148, 120;
+  --accent-soft-rgb: 90, 60, 55;
+
+  /* night 模式下描边改用比 paper 略亮的一圈 --card，不会变成一道白杠 */
+  --glass-composer-shadow: 0 0 0 1px rgba(var(--card-rgb), .90),
+                           0 8px 28px rgba(0, 0, 0, .28),
+                           inset 0 1px 0 rgba(var(--card-rgb), .55);
+}

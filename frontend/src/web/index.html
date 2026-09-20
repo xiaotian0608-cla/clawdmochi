@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TianKe</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <div id="splash">
+      <div class="splash-mark">💠</div>
+      <div class="splash-name">TianKe</div>
+      <div class="splash-hint">Tap to skip</div>
+    </div>
+
+    <header id="app-header">
+      <div class="app-title">
+        <strong>TianKe</strong>
+        <span class="status-dot">•</span>
+        <span class="status-text" id="status-text">在线</span>
+      </div>
+      <button id="theme-toggle" type="button" aria-label="切换主题">☾ / ☀</button>
+    </header>
+
+    <main id="chat-scroll"></main>
+
+    <div id="quick-actions">
+      <button class="quick-chip" type="button" data-action="steps">步数</button>
+      <button class="quick-chip" type="button" data-action="location">定位</button>
+      <button class="quick-chip" type="button" data-action="photo">拍照</button>
+      <button class="quick-chip" type="button" data-action="file">文件</button>
+    </div>
+
+    <div id="composer-wrap">
+      <form id="composer">
+        <textarea
+          id="composer-input"
+          rows="1"
+          placeholder="跟 TianKe 说点什么…"
+        ></textarea>
+        <button id="composer-send" type="submit" disabled aria-label="发送">➤</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
