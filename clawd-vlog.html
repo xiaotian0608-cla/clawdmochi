@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clawd 上班 Vlog</title>
+<style>
+  html,body{margin:0;height:100%;background:#1a1410;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif}
+  canvas{max-width:100vw;max-height:100vh;image-rendering:pixelated;border-radius:8px;box-shadow:0 10px 40px #0008}
+</style>
+</head>
+<body>
+<canvas id="c" width="960" height="540"></canvas>
+<script>
+// 即时模式渲染：没有场景图 / 保留对象，每一帧清空画布，根据时间 t 从零重绘所有内容。
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const ORANGE = '#D97757', DARK = '#2b2118';
+
+// ---------- 场景表 ----------
+const SCENES = [
+  { dur: 6, title: '07:00  起床', sub: '闹钟响了……再睡五分钟', draw: sceneWake },
+  { dur: 6, title: '08:15  通勤', sub: '地铁上刷一下 issue', draw: sceneCommute },
+  { dur: 7, title: '09:30  写代码', sub: 'git push 成功 ✓', draw: sceneCode },
+  { dur: 6, title: '12:00  午饭', sub: '今天吃拉面 🍜', draw: sceneLunch },
+  { dur: 6, title: '15:00  开会', sub: '"这个需求很简单"', draw: sceneMeeting },
+  { dur: 6, title: '19:00  下班', sub: '今天也辛苦了，明天见！', draw: sceneHome },
+];
+const TOTAL = SCENES.reduce((s, x) => s + x.dur, 0);
+
+// ---------- 基础图元 ----------
+function rect(x, y, w, h, c) { g.fillStyle = c; g.fillRect(x, y, w, h); }
+function circle(x, y, r, c) { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+function text(s, x, y, size, c, align = 'left', weight = 700) {
+  g.font = `${weight} ${size}px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif`;
+  g.fillStyle = c; g.textAlign = align; g.fillText(s, x, y);
+}
+function lerp(a, b, k) { return a + (b - a) * k; }
+function ease(k) { return k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; }
+
+// ---------- 主角 Clawd（像素小螃蟹）----------
+// opts: blink, walk(相位), eyes('open'|'closed'|'happy'), arm(举手 0..1), scale
+function clawd(x, y, t, o = {}) {
+  const s = o.scale || 1;
+  g.save(); g.translate(x, y); g.scale(s, s);
+  const bob = o.walk != null ? Math.abs(Math.sin(o.walk * 8)) * -4 : Math.sin(t * 2) * 1.5;
+  // 影子
+  g.fillStyle = '#0003'; g.beginPath(); g.ellipse(0, 4, 38, 7, 0, 0, Math.PI * 2); g.fill();
+  g.translate(0, bob);
+  // 腿
+  const lp = o.walk != null ? Math.sin(o.walk * 8) * 4 : 0;
+  for (const [lx, d] of [[-24, 1], [-10, -1], [10, 1], [24, -1]]) rect(lx - 3, -14 + lp * d * .5, 6, 14 - lp * d * .5, ORANGE);
+  // 身体
+  rect(-34, -56, 68, 44, ORANGE);
+  // 钳子（手臂）
+  const a = o.arm || 0;
+  rect(-46, -44 - a * 18, 12, 12, ORANGE);
+  rect(34, -44 - (o.armR != null ? o.armR : 0) * 18, 12, 12, ORANGE);
+  // 眼睛
+  const blink = (t * 1.3 % 3) < .12;
+  const eyes = o.eyes || 'open';
+  g.fillStyle = DARK;
+  if (eyes === 'closed' || blink) { rect(-20, -40, 10, 3, DARK); rect(10, -40, 10, 3, DARK); }
+  else if (eyes === 'happy') {
+    g.strokeStyle = DARK; g.lineWidth = 3;
+    for (const ex of [-15, 15]) { g.beginPath(); g.arc(ex, -36, 5, Math.PI, 0); g.stroke(); }
+  } else { rect(-20, -46, 8, 12, DARK); rect(12, -46, 8, 12, DARK); }
+  if (o.blush) { circle(-24, -26, 4, '#f4a3a3aa'); circle(24, -26, 4, '#f4a3a3aa'); }
+  g.restore();
+}
+
+// ---------- 场景 ----------
+function sceneWake(t, k) {
+  // 窗外天色从黎明变亮
+  rect(0, 0, W, H, '#f3e3cf');
+  const sky = g.createLinearGradient(0, 60, 0, 260);
+  sky.addColorStop(0, `hsl(${lerp(250, 205, k)},60%,${lerp(35, 72, k)}%)`);
+  sky.addColorStop(1, `hsl(${lerp(20, 40, k)},90%,${lerp(60, 85, k)}%)`);
+  rect(600, 60, 260, 200, sky);
+  circle(730, lerp(260, 150, ease(k)), 30, '#ffd66b');
+  rect(600, 60, 260, 200, '#0000'); g.strokeStyle = '#8a6a4a'; g.lineWidth = 10; g.strokeRect(600, 60, 260, 200);
+  rect(725, 60, 10, 200, '#8a6a4a');
+  rect(0, 400, W, 140, '#c9a37c');
+  // 床
+  rect(120, 330, 360, 90, '#fff'); rect(100, 300, 30, 130, '#8a6a4a'); rect(480, 340, 20, 90, '#8a6a4a');
+  // 闹钟
+  const ring = k < .5 ? Math.sin(t * 40) * 3 : 0;
+  g.save(); g.translate(560 + ring, 360);
+  rect(-10, 0, 60, 40, '#6b4c35'); circle(20, -20, 26, '#e74c3c'); circle(20, -20, 20, '#fff');
+  g.strokeStyle = DARK; g.lineWidth = 3; g.beginPath(); g.moveTo(20, -20); g.lineTo(20, -34); g.moveTo(20, -20); g.lineTo(30, -20); g.stroke();
+  g.restore();
+  if (k < .5) text('RING! RING!', 580, 300, 20, '#e74c3c', 'center');
+  // Clawd 在被子里，后半段坐起来
+  const up = ease(Math.min(1, Math.max(0, (k - .45) / .3)));
+  clawd(280, lerp(360, 320, up), t, { eyes: k < .5 ? 'closed' : 'open', arm: up * (k > .8 ? Math.abs(Math.sin(t * 6)) : 0) });
+  rect(150, 340, 300, 70, '#8fb3d9'); rect(150, 340, 300, 10, '#7aa0c8');
+  if (k < .45) for (let i = 0; i < 3; i++) {
+    const p = (t * .8 + i / 3) % 1;
+    text('z', 330 + p * 60, 290 - p * 70, 16 + p * 16, `rgba(60,60,90,${1 - p})`);
+  }
+}
+
+function sceneCommute(t, k) {
+  // 窗外景物横向滚动（视差）
+  const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#9fd3f0'); sky.addColorStop(1, '#e6f4fb');
+  rect(0, 0, W, H, sky);
+  for (let i = 0; i < 12; i++) { // 远处楼
+    const x = ((i * 120 - t * 60) % 1440 + 1440) % 1440 - 200;
+    rect(x, 120 + (i * 37 % 80), 90, 300, `hsl(210,20%,${55 + i % 3 * 8}%)`);
+  }
+  for (let i = 0; i < 10; i++) { // 近处电线杆
+    const x = ((i * 200 - t * 400) % 2000 + 2000) % 2000 - 100;
+    rect(x, 100, 10, 300, '#555');
+  }
+  // 车厢
+  rect(0, 0, W, 80, '#ddd'); rect(0, 330, W, 210, '#c7ccd1');
+  for (let x = 40; x < W; x += 300) { rect(x, 80, 20, 250, '#ddd'); }
+  rect(0, 80, W, 10, '#bbb'); rect(0, 322, W, 10, '#999');
+  // 吊环
+  for (let x = 120; x < W; x += 140) {
+    const sw = Math.sin(t * 3 + x) * 4;
+    g.strokeStyle = '#888'; g.lineWidth = 3; g.beginPath(); g.moveTo(x, 80); g.lineTo(x + sw, 120); g.stroke();
+    g.beginPath(); g.arc(x + sw, 132, 12, 0, 7); g.stroke();
+  }
+  // 座椅
+  rect(260, 420, 440, 60, '#3d6db3');
+  const shake = Math.sin(t * 25) * 1.2;
+  clawd(480, 430 + shake, t, { armR: .7 });
+  // 手机
+  rect(522, 340 + shake, 26, 42, '#222'); rect(525, 344 + shake, 20, 32, '#6cf');
+  // 气泡
+  bubble(600, 250, '#42 修复登录 bug', k > .2);
+  if (k > .6) bubble(600, 300, '👍 LGTM', true);
+}
+
+function bubble(x, y, s, show) {
+  if (!show) return;
+  g.font = '600 18px system-ui, "PingFang SC", sans-serif';
+  const w = g.measureText(s).width + 28;
+  g.fillStyle = '#fff'; g.beginPath(); g.roundRect(x, y - 26, w, 38, 12); g.fill();
+  g.strokeStyle = '#0002'; g.lineWidth = 2; g.stroke();
+  text(s, x + 14, y, 18, DARK, 'left', 600);
+}
+
+function sceneCode(t, k) {
+  rect(0, 0, W, H, '#efe6da');
+  rect(0, 380, W, 160, '#b58b62'); rect(0, 380, W, 14, '#9c7550');
+  // 盆栽 & 咖啡
+  rect(80, 320, 50, 60, '#c0663f'); circle(105, 300, 30, '#4f9a5a'); circle(90, 280, 18, '#5fb06b');
+  rect(760, 340, 40, 40, '#fff'); g.strokeStyle = '#fff'; g.lineWidth = 6; g.beginPath(); g.arc(805, 360, 10, -1.5, 1.5); g.stroke();
+  for (let i = 0; i < 3; i++) {
+    const p = (t * .6 + i / 3) % 1;
+    g.strokeStyle = `rgba(150,150,150,${1 - p})`; g.lineWidth = 3; g.beginPath();
+    g.moveTo(772 + i * 8, 335 - p * 50); g.quadraticCurveTo(778 + i * 8 + Math.sin(t * 4 + i) * 8, 320 - p * 50, 772 + i * 8, 305 - p * 50); g.stroke();
+  }
+  // 显示器：代码一行一行打出来
+  rect(260, 90, 440, 270, '#222'); rect(275, 105, 410, 230, '#1e1e2e');
+  rect(460, 360, 40, 22, '#333');
+  const code = [
+    [['#c678dd', 'async function '], ['#61afef', 'shipIt'], ['#abb2bf', '() {']],
+    [['#abb2bf', '  const '], ['#e5c07b', 'tests'], ['#abb2bf', ' = await run();']],
+    [['#c678dd', '  if '], ['#abb2bf', '(tests.'], ['#98c379', 'pass'], ['#abb2bf', ') {']],
+    [['#abb2bf', '    await git.'], ['#61afef', 'push'], ['#abb2bf', '();']],
+    [['#abb2bf', '  }']],
+    [['#abb2bf', '}']],
+  ];
+  const chars = Math.floor(k * 1.4 * 120);
+  let used = 0;
+  g.font = '16px ui-monospace, Menlo, monospace'; g.textAlign = 'left';
+  code.forEach((ln, i) => {
+    let x = 290;
+    for (const [c, s] of ln) {
+      const n = Math.max(0, Math.min(s.length, chars - used)); used += s.length;
+      g.fillStyle = c; g.fillText(s.slice(0, n), x, 135 + i * 26); x += g.measureText(s).width;
+    }
+  });
+  if ((t * 2 | 0) % 2) rect(290, 280, 9, 18, '#abb2bf');
+  const done = k > .8;
+  if (done) { rect(275, 300, 410, 35, '#2e7d32'); text('✓ All checks passed', 480, 324, 18, '#fff', 'center'); }
+  // Clawd 背影坐在前面敲键盘
+  const typing = done ? 0 : Math.abs(Math.sin(t * 18));
+  rect(380, 386, 200, 12, '#444');
+  clawd(480, 452, t, { arm: done ? 1 : typing * .3, armR: done ? 1 : (1 - typing) * .3, eyes: done ? 'happy' : 'open', scale: 1.2 });
+}
+
+function sceneLunch(t, k) {
+  rect(0, 0, W, H, '#fbe2c0');
+  // 暖帘
+  for (let i = 0; i < 5; i++) { rect(250 + i * 95, 0, 85, 110 + Math.sin(t * 2 + i) * 4, '#8b1e1e'); }
+  text('ら ー め ん', 480, 70, 32, '#fff', 'center');
+  rect(0, 380, W, 160, '#8a5a3b');
+  clawd(480, 372, t, { eyes: 'happy', blush: true, armR: .8, scale: .9 });
+  // 拉面碗
+  g.fillStyle = '#fff'; g.beginPath(); g.ellipse(480, 400, 130, 30, 0, 0, 7); g.fill();
+  g.fillStyle = '#c0392b'; g.beginPath(); g.moveTo(350, 400); g.quadraticCurveTo(480, 520, 610, 400); g.fill();
+  g.fillStyle = '#e8b86b'; g.beginPath(); g.ellipse(480, 400, 118, 24, 0, 0, 7); g.fill();
+  circle(440, 395, 16, '#fff'); circle(440, 395, 8, '#f5a623');
+  rect(500, 385, 50, 14, '#b5654a'); circle(420, 408, 6, '#4f9a5a'); circle(530, 410, 6, '#4f9a5a');
+  // 热气
+  for (let i = 0; i < 4; i++) {
+    const p = (t * .5 + i / 4) % 1;
+    g.strokeStyle = `rgba(255,255,255,${.8 - p * .8})`; g.lineWidth = 4; g.beginPath();
+    const bx = 420 + i * 40; g.moveTo(bx, 370 - p * 80); g.quadraticCurveTo(bx + Math.sin(t * 3 + i) * 15, 350 - p * 80, bx, 330 - p * 80); g.stroke();
+  }
+  // Clawd 拿筷子吸面
+  const slurp = (t * 1.5) % 1;
+  g.strokeStyle = '#8a6a4a'; g.lineWidth = 4;
+  g.beginPath(); g.moveTo(525, 322); g.lineTo(490, 400 - slurp * 30); g.moveTo(535, 327); g.lineTo(500, 402 - slurp * 30); g.stroke();
+  g.strokeStyle = '#f3d27a'; g.lineWidth = 3;
+  for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(488 + i * 5, 400 - slurp * 30); g.lineTo(478 + i * 5, 350); g.stroke(); }
+  if (k > .5) text('好吃！', 620, 240, 28, '#c0392b', 'left');
+}
+
+function sceneMeeting(t, k) {
+  rect(0, 0, W, H, '#dfe6ee');
+  // 白板 & 图表
+  rect(560, 60, 340, 220, '#fff'); g.strokeStyle = '#999'; g.lineWidth = 4; g.strokeRect(560, 60, 340, 220);
+  const bars = [60, 90, 70, 140];
+  bars.forEach((b, i) => rect(600 + i * 70, 250 - b * Math.min(1, k * 2), 40, b * Math.min(1, k * 2), ['#61afef', '#98c379', '#e5c07b', ORANGE][i]));
+  text('Q3 目标', 730, 95, 20, DARK, 'center');
+  // 桌子
+  rect(40, 380, 880, 30, '#6b4c35'); rect(40, 410, 880, 130, '#5a3f2c');
+  // 同事们（灰色方块人）
+  const col = ['#8e9aaf', '#a3b18a', '#b08968'];
+  [140, 300, 780].forEach((x, i) => {
+    const nod = Math.sin(t * 2 + i) * 2;
+    rect(x - 30, 300 + nod, 60, 80, col[i]); rect(x - 14, 320 + nod, 6, 8, DARK); rect(x + 8, 320 + nod, 6, 8, DARK);
+  });
+  // Clawd 逐渐犯困
+  const sleepy = k > .5;
+  clawd(470, 390, t, { eyes: sleepy ? 'closed' : 'open', scale: 1 });
+  if (sleepy) {
+    const p = (t % 1.2) / 1.2; text('z', 510 + p * 30, 300 - p * 40, 18 + p * 10, `rgba(60,60,90,${1 - p})`);
+  }
+  // 发言气泡
+  bubble(100, 240, k < .5 ? '这个需求很简单…' : '…所以我们再对齐一下', true);
+  // 时钟指针飞转
+  circle(300, 110, 50, '#fff'); g.strokeStyle = DARK; g.lineWidth = 4; g.beginPath(); g.arc(300, 110, 50, 0, 7); g.stroke();
+  const ang = t * 3;
+  g.beginPath(); g.moveTo(300, 110); g.lineTo(300 + Math.cos(ang) * 38, 110 + Math.sin(ang) * 38);
+  g.moveTo(300, 110); g.lineTo(300 + Math.cos(ang / 12) * 24, 110 + Math.sin(ang / 12) * 24); g.stroke();
+}
+
+function sceneHome(t, k) {
+  // 夕阳渐变 → 夜
+  const sky = g.createLinearGradient(0, 0, 0, 400);
+  const mix = (a, b) => `rgb(${a.map((v, i) => lerp(v, b[i], k) | 0)})`;
+  sky.addColorStop(0, mix([240, 130, 90], [20, 24, 60]));
+  sky.addColorStop(1, mix([255, 200, 120], [70, 50, 110]));
+  rect(0, 0, W, H, sky);
+  circle(760, lerp(200, 440, k), 50, `rgba(255,${lerp(170, 120, k) | 0},80,${1 - k * .6})`);
+  // 星星
+  for (let i = 0; i < 40; i++) {
+    const a = Math.max(0, k - .4) * 1.6 * (.5 + .5 * Math.sin(t * 3 + i));
+    circle((i * 97) % W, (i * 53) % 260, 1.6, `rgba(255,255,255,${a})`);
+  }
+  // 城市剪影 + 亮起的窗
+  for (let i = 0; i < 9; i++) {
+    const bx = i * 110, bh = 140 + (i * 71 % 120);
+    rect(bx, 400 - bh, 100, bh, '#2a2238');
+    for (let wy = 420 - bh; wy < 390; wy += 26) for (let wx = bx + 12; wx < bx + 90; wx += 24) {
+      if (((wx * 7 + wy * 3) % 5) < 2 && k > .3) rect(wx, wy, 12, 14, '#ffd97a');
+    }
+  }
+  rect(0, 400, W, 140, '#3a3048');
+  // Clawd 走过屏幕，挥手
+  const x = lerp(-60, W + 60, k);
+  clawd(x, 452, t, { walk: t, arm: Math.abs(Math.sin(t * 5)), eyes: 'happy' });
+  // 路灯
+  for (let lx = 150; lx < W; lx += 330) {
+    rect(lx, 300, 8, 170, '#222'); circle(lx + 4, 296, 12, k > .3 ? '#ffe9a8' : '#888');
+    if (k > .3) { g.fillStyle = 'rgba(255,233,168,.12)'; g.beginPath(); g.moveTo(lx + 4, 296); g.lineTo(lx - 60, 470); g.lineTo(lx + 68, 470); g.fill(); }
+  }
+}
+
+// ---------- Vlog UI 叠加层 ----------
+function overlay(scene, idx, k, t, gt) {
+  // 转场淡入淡出
+  const fade = Math.min(1, k * scene.dur / .4, (1 - k) * scene.dur / .4);
+  rect(0, 0, W, H, `rgba(0,0,0,${1 - fade})`);
+  // 字幕条
+  const a = Math.min(1, k * scene.dur / .8);
+  g.globalAlpha = a;
+  rect(0, H - 80, W, 80, 'rgba(0,0,0,.55)');
+  text(scene.title, 30, H - 46, 26, ORANGE);
+  text(scene.sub, 30, H - 18, 18, '#fff', 'left', 500);
+  g.globalAlpha = 1;
+  // REC 点 + 时间码
+  if ((t * 2 | 0) % 2) circle(34, 30, 8, '#e53935');
+  text('REC', 50, 37, 18, '#fff');
+  const s = gt | 0;
+  text(`00:${String(s / 60 | 0).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`, W - 24, 37, 18, '#fff', 'right');
+  text('Clawd 的一天 · DAY VLOG', W / 2, 37, 16, '#ffffffcc', 'center', 600);
+  // 取景框四角
+  g.strokeStyle = '#ffffffaa'; g.lineWidth = 3;
+  for (const [cx, cy, dx, dy] of [[14, 56, 1, 1], [W - 14, 56, -1, 1], [14, H - 94, 1, -1], [W - 14, H - 94, -1, -1]]) {
+    g.beginPath(); g.moveTo(cx, cy + dy * 24); g.lineTo(cx, cy); g.lineTo(cx + dx * 24, cy); g.stroke();
+  }
+  // 进度条
+  rect(0, H - 4, W, 4, '#fff3'); rect(0, H - 4, W * gt / TOTAL, 4, ORANGE);
+}
+
+// ---------- 主循环：每帧全量重绘 ----------
+let start = performance.now(), paused = false, pauseAt = 0;
+cv.addEventListener('click', () => {
+  if (paused) start += performance.now() - pauseAt; else pauseAt = performance.now();
+  paused = !paused;
+});
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (paused) return;
+  const gt = ((now - start) / 1000) % TOTAL;
+  let acc = 0, idx = 0;
+  while (gt >= acc + SCENES[idx].dur) acc += SCENES[idx++].dur;
+  const scene = SCENES[idx], local = gt - acc, k = local / scene.dur;
+  g.clearRect(0, 0, W, H);
+  g.save(); scene.draw(gt, k); g.restore();
+  overlay(scene, idx, k, gt, gt);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
