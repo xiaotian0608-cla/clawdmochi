@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ハネムーン Vlog</title>
+<style>
+  html,body{margin:0;height:100%;background:#1a1410;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif}
+  canvas{max-width:100vw;max-height:100vh;image-rendering:pixelated;border-radius:8px;box-shadow:0 10px 40px #0008}
+</style>
+</head>
+<body>
+<canvas id="c" width="960" height="540"></canvas>
+<script>
+// 即时模式渲染：没有场景图 / 保留对象，每一帧清空画布，根据时间 t 从零重绘所有内容。
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const ORANGE = '#D97757', DARK = '#2b2118';
+
+// ---------- 场景表 ----------
+const SCENES = [
+  { dur: 6, title: 'DAY 1  出発 ✈️', sub: 'スーツケースを持って、いざ出発！', draw: sceneAirport },
+  { dur: 6, title: 'DAY 1  空の上', sub: '雲の上ってこんな感じなんだ', draw: scenePlane },
+  { dur: 7, title: 'DAY 2  ビーチ 🏝️', sub: 'かき氷は半分こ', draw: sceneBeach },
+  { dur: 7, title: 'DAY 2  夕焼けさんぽ', sub: '手をつないで波打ち際を歩く', draw: sceneSunset },
+  { dur: 7, title: 'DAY 3  花火 🎆', sub: 'きれいだね', draw: sceneFireworks },
+  { dur: 6, title: 'おかえり', sub: '最高の旅だったね ♡', draw: sceneAlbum },
+];
+const TOTAL = SCENES.reduce((s, x) => s + x.dur, 0);
+
+// ---------- 基础图元 ----------
+function rect(x, y, w, h, c) { g.fillStyle = c; g.fillRect(x, y, w, h); }
+function circle(x, y, r, c) { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+function text(s, x, y, size, c, align = 'left', weight = 700) {
+  g.font = `${weight} ${size}px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif`;
+  g.fillStyle = c; g.textAlign = align; g.fillText(s, x, y);
+}
+function lerp(a, b, k) { return a + (b - a) * k; }
+function ease(k) { return k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; }
+
+// ---------- 主角 Clawd（像素小螃蟹）----------
+// opts: blink, walk(相位), eyes('open'|'closed'|'happy'), arm(举手 0..1), scale
+function clawd(x, y, t, o = {}) {
+  const s = o.scale || 1;
+  g.save(); g.translate(x, y); g.scale(s, s);
+  const bob = o.walk != null ? Math.abs(Math.sin(o.walk * 8)) * -4 : Math.sin(t * 2) * 1.5;
+  // 影子
+  g.fillStyle = '#0003'; g.beginPath(); g.ellipse(0, 4, 38, 7, 0, 0, Math.PI * 2); g.fill();
+  g.translate(0, bob);
+  // 腿
+  const lp = o.walk != null ? Math.sin(o.walk * 8) * 4 : 0;
+  for (const [lx, d] of [[-24, 1], [-10, -1], [10, 1], [24, -1]]) rect(lx - 3, -14 + lp * d * .5, 6, 14 - lp * d * .5, ORANGE);
+  // 身体
+  rect(-34, -56, 68, 44, ORANGE);
+  // 钳子（手臂）
+  const a = o.arm || 0;
+  rect(-46, -44 - a * 18, 12, 12, ORANGE);
+  rect(34, -44 - (o.armR != null ? o.armR : 0) * 18, 12, 12, ORANGE);
+  // 眼睛
+  const blink = (t * 1.3 % 3) < .12;
+  const eyes = o.eyes || 'open';
+  g.fillStyle = DARK;
+  if (eyes === 'closed' || blink) { rect(-20, -40, 10, 3, DARK); rect(10, -40, 10, 3, DARK); }
+  else if (eyes === 'happy') {
+    g.strokeStyle = DARK; g.lineWidth = 3;
+    for (const ex of [-15, 15]) { g.beginPath(); g.arc(ex, -36, 5, Math.PI, 0); g.stroke(); }
+  } else { rect(-20, -46, 8, 12, DARK); rect(12, -46, 8, 12, DARK); }
+  if (o.blush) { circle(-24, -26, 4, '#f4a3a3aa'); circle(24, -26, 4, '#f4a3a3aa'); }
+  g.restore();
+}
+
+// ---------- 你（人类搭档，简单圆头小人）----------
+function human(x, y, t, o = {}) {
+  const s = o.scale || 1;
+  g.save(); g.translate(x, y); g.scale(s, s);
+  g.fillStyle = '#0003'; g.beginPath(); g.ellipse(0, 4, 40, 7, 0, 0, Math.PI * 2); g.fill();
+  const bob = o.walk != null ? -Math.abs(Math.sin(o.walk * 8)) * 4 : o.jump ? -Math.abs(Math.sin(t * 8)) * 20 : Math.sin(t * 2 + 1) * 1.5;
+  g.translate(0, bob);
+  const HOOD = o.color || '#5b7bd5';
+  // 身体（卫衣）
+  g.fillStyle = HOOD; g.beginPath(); g.roundRect(-34, -90, 68, 90, 18); g.fill();
+  // 手臂
+  const aL = o.arm || 0, aR = o.armR || 0;
+  g.strokeStyle = HOOD; g.lineWidth = 14; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(-30, -70); g.lineTo(-48, -40 - aL * 70); g.stroke();
+  g.beginPath(); g.moveTo(30, -70); g.lineTo(48, -40 - aR * 70); g.stroke();
+  circle(-48, -40 - aL * 70, 8, '#f1c7a1'); circle(48, -40 - aR * 70, 8, '#f1c7a1');
+  // 头
+  if (o.long) { g.fillStyle = '#3a2a22'; g.beginPath(); g.roundRect(-38, -150, 76, 100, 30); g.fill(); }
+  circle(0, -120, 32, '#f1c7a1');
+  g.fillStyle = '#3a2a22'; g.beginPath(); g.arc(0, -126, 33, Math.PI * 1.05, Math.PI * 1.95); g.fill();
+  if (o.long) { for (let i = 0; i < 5; i++) circle(24 + Math.cos(i * 1.26) * 7, -142 + Math.sin(i * 1.26) * 7, 5, '#ff7aa2'); circle(24, -142, 4, '#ffd66b'); }
+  // 脸
+  const blink = ((t + 1.1) * 1.3 % 3) < .12, e = o.eyes || 'open';
+  if (e === 'closed' || blink) { rect(-14, -118, 9, 3, DARK); rect(5, -118, 9, 3, DARK); }
+  else if (e === 'happy') {
+    g.strokeStyle = DARK; g.lineWidth = 3; g.lineCap = 'butt';
+    for (const ex of [-10, 10]) { g.beginPath(); g.arc(ex, -115, 5, Math.PI, 0); g.stroke(); }
+  } else { circle(-10, -117, 4, DARK); circle(10, -117, 4, DARK); }
+  g.strokeStyle = DARK; g.lineWidth = 2.5; g.beginPath();
+  if (o.mouth === 'o') { g.arc(0, -102, 5, 0, 7); } else g.arc(0, -106, 7, .2, Math.PI - .2);
+  g.stroke();
+  if (o.blush) { circle(-20, -106, 5, '#f4a3a388'); circle(20, -106, 5, '#f4a3a388'); }
+  g.restore();
+}
+
+function bubble(x, y, s, show = true, bg = '#fff') {
+  if (!show) return;
+  g.font = '600 18px system-ui, "PingFang SC", sans-serif';
+  const w = g.measureText(s).width + 28;
+  g.fillStyle = bg; g.beginPath(); g.roundRect(x, y - 26, w, 38, 12); g.fill();
+  g.strokeStyle = '#0002'; g.lineWidth = 2; g.stroke();
+  text(s, x + 14, y, 18, DARK, 'left', 600);
+}
+function typed(s, k) { return s.slice(0, Math.floor(s.length * Math.min(1, Math.max(0, k)))); }
+function heart(x, y, r, c) {
+  g.fillStyle = c; g.beginPath(); g.moveTo(x, y + r);
+  g.bezierCurveTo(x - r * 2, y - r * .5, x - r * .6, y - r * 1.8, x, y - r * .6);
+  g.bezierCurveTo(x + r * .6, y - r * 1.8, x + r * 2, y - r * .5, x, y + r); g.fill();
+}
+function room(wall, floor) {
+  rect(0, 0, W, H, wall); rect(0, 390, W, 150, floor);
+}
+function desk() { rect(80, 360, 800, 20, '#9c7550'); rect(110, 380, 16, 80, '#8a6a4a'); rect(834, 380, 16, 80, '#8a6a4a'); }
+function laptop(x, y, open = 1, screen = '#1e1e2e') {
+  rect(x - 110, y, 220, 10, '#aab'); // 底座
+  const h = 140 * open;
+  rect(x - 100, y - h, 200, h, '#667'); if (open > .3) rect(x - 92, y - h + 8, 184, h - 16, screen);
+}
+
+// ---------- 场景 ----------
+function sea(t, top, c1, c2) {
+  const gr = g.createLinearGradient(0, top, 0, H); gr.addColorStop(0, c1); gr.addColorStop(1, c2);
+  g.fillStyle = gr; g.fillRect(0, top, W, H - top);
+  g.strokeStyle = 'rgba(255,255,255,.5)'; g.lineWidth = 3;
+  for (let r = 0; r < 4; r++) {
+    g.beginPath();
+    for (let x = 0; x <= W; x += 20) g.lineTo(x, top + 20 + r * 30 + Math.sin(x / 40 + t * 2 + r) * 4);
+    g.stroke();
+  }
+}
+function suitcase(x, y, c) {
+  g.fillStyle = c; g.beginPath(); g.roundRect(x - 28, y - 70, 56, 70, 8); g.fill();
+  g.strokeStyle = '#555'; g.lineWidth = 4; g.strokeRect(x - 10, y - 88, 20, 18);
+  circle(x - 18, y + 3, 5, '#333'); circle(x + 18, y + 3, 5, '#333');
+}
+
+function sceneAirport(t, k) {
+  room('#e9eef3', '#cfd6de');
+  // 大きな窓と飛行機
+  rect(80, 60, 800, 250, '#a9d8f5'); rect(80, 250, 800, 60, '#9aa5ae');
+  const p = ease(k);
+  g.save(); g.translate(lerp(150, 900, p), lerp(260, 90, p)); g.rotate(-.25 * Math.min(1, p * 3));
+  rect(-70, -10, 140, 22, '#fff'); rect(-10, -40, 30, 70, '#dde'); rect(-70, -34, 18, 30, ORANGE);
+  g.restore();
+  g.strokeStyle = '#8a97a3'; g.lineWidth = 8; g.strokeRect(80, 60, 800, 250);
+  for (let x = 280; x < 880; x += 200) rect(x, 60, 8, 250, '#8a97a3');
+  // 出発案内板
+  rect(340, 72, 280, 34, '#222'); text('✈ HONOLULU   14:30   ON TIME', 480, 95, 15, '#ffd66b', 'center', 600);
+  const walk = lerp(-80, 360, Math.min(1, k * 1.4));
+  suitcase(walk - 60, 470, '#f4a3b8');
+  human(walk, 470, t, { long: true, walk: t, eyes: 'happy', armR: .1 });
+  suitcase(walk + 190, 470, '#8fb3d9');
+  clawd(walk + 130, 470, t, { walk: t, eyes: 'happy', arm: .2 });
+  if (k > .7) bubble(walk - 40, 300, 'いってきまーす！');
+}
+
+function scenePlane(t, k) {
+  room('#f2efe9', '#d8d2c8');
+  // 機内の窓
+  for (const wx of [200, 560]) {
+    g.save(); g.beginPath(); g.roundRect(wx, 80, 200, 220, 90); g.clip();
+    const sky = g.createLinearGradient(0, 80, 0, 300); sky.addColorStop(0, '#6fb7ef'); sky.addColorStop(1, '#d6efff');
+    g.fillStyle = sky; g.fillRect(wx, 80, 200, 220);
+    for (let i = 0; i < 6; i++) {
+      const cx = wx + ((i * 90 - t * 50) % 360 + 360) % 360 - 60, cy = 150 + (i * 47 % 110);
+      circle(cx, cy, 22, '#fff'); circle(cx + 22, cy + 4, 18, '#fff'); circle(cx - 20, cy + 6, 16, '#fff');
+    }
+    g.restore();
+    g.strokeStyle = '#cfc8bd'; g.lineWidth = 12; g.beginPath(); g.roundRect(wx, 80, 200, 220, 90); g.stroke();
+  }
+  // 座席
+  rect(150, 330, 660, 150, '#3d5a80'); rect(150, 320, 660, 16, '#2e4766');
+  human(330, 460, t, { long: true, eyes: k > .5 ? 'closed' : 'happy', blush: true });
+  clawd(620, 440, t, { eyes: 'open', armR: .6 });
+  if (k > .5) {
+    const p = (t % 1.3) / 1.3; text('z', 360 + p * 30, 300 - p * 40, 18 + p * 8, `rgba(80,80,120,${1 - p})`);
+    // ブランケットをかけてあげる
+    g.fillStyle = '#f4a3b8'; g.beginPath(); g.roundRect(270, 390, 120, 70, 12); g.fill();
+  }
+  bubble(560, 345, k < .5 ? '見て、雲がふわふわ！' : '（おやすみ、着いたら起こすね）');
+}
+
+function sceneBeach(t, k) {
+  const sky = g.createLinearGradient(0, 0, 0, 260); sky.addColorStop(0, '#5bc0f0'); sky.addColorStop(1, '#bfeaff');
+  rect(0, 0, W, H, sky); g.fillStyle = sky; g.fillRect(0, 0, W, 260);
+  circle(820, 90, 40, '#ffe27a');
+  sea(t, 240, '#2bb3c9', '#7fd9e0');
+  rect(0, 360, W, 180, '#f3dcaa');
+  // ヤシの木
+  rect(90, 150, 18, 220, '#8a5a3b');
+  for (let i = 0; i < 5; i++) {
+    g.save(); g.translate(99, 150); g.rotate(-2.6 + i * .55 + Math.sin(t * 1.5) * .05);
+    g.fillStyle = '#3f9a55'; g.beginPath(); g.ellipse(50, 0, 55, 14, 0, 0, 7); g.fill(); g.restore();
+  }
+  // パラソル
+  g.fillStyle = '#e06c75'; g.beginPath(); g.moveTo(480, 200); g.quadraticCurveTo(480, 150, 600, 170); g.quadraticCurveTo(700, 190, 700, 250); g.fill();
+  g.strokeStyle = '#666'; g.lineWidth = 5; g.beginPath(); g.moveTo(600, 175); g.lineTo(580, 380); g.stroke();
+  human(420, 460, t, { long: true, color: '#ffb3c7', eyes: 'happy', blush: true, armR: .45 });
+  clawd(620, 460, t, { eyes: 'happy', arm: .5, blush: true });
+  // かき氷をスプーンで「あーん」
+  g.fillStyle = '#fff'; g.beginPath(); g.moveTo(505, 355); g.lineTo(545, 355); g.lineTo(535, 385); g.lineTo(515, 385); g.fill();
+  g.fillStyle = '#ff7aa2'; g.beginPath(); g.arc(525, 352, 22, Math.PI, 0); g.fill();
+  circle(525, 336, 5, '#e33');
+  if (k > .5) {
+    const p = Math.min(1, (k - .5) * 4);
+    heart(lerp(525, 560, p), lerp(320, 250, p), 12, `rgba(255,90,130,${1 - p * .3})`);
+    bubble(300, 110, 'はい、あーん🍧');
+  }
+  if (k > .75) bubble(560, 160, 'つめたっ！おいしい！');
+}
+
+function sceneSunset(t, k) {
+  const sky = g.createLinearGradient(0, 0, 0, 300);
+  sky.addColorStop(0, '#6b4a9e'); sky.addColorStop(.6, '#f08a5d'); sky.addColorStop(1, '#ffc97a');
+  g.fillStyle = sky; g.fillRect(0, 0, W, H);
+  circle(480, lerp(230, 290, k), 60, '#ffdf8a');
+  sea(t, 280, '#e98a6b', '#6b4a9e');
+  rect(0, 400, W, 140, '#c99b7a');
+  // 足あと
+  const x = lerp(80, 760, k);
+  for (let fx = 60; fx < x - 60; fx += 36) { circle(fx, 470, 4, '#a87a5a'); circle(fx + 18, 478, 4, '#a87a5a'); }
+  // シルエット：手とハサミをつなぐ
+  g.globalAlpha = .9;
+  human(x, 470, t, { long: true, color: '#3a2a50', walk: t, armR: .15 });
+  clawd(x + 95, 470, t, { walk: t, arm: .15 });
+  g.globalAlpha = 1;
+  for (let i = 0; i < 3; i++) {
+    const p = (t * .5 + i / 3) % 1;
+    heart(x + 50 + Math.sin(t * 2 + i) * 20, 330 - p * 120, 8 + p * 4, `rgba(255,140,170,${1 - p})`);
+  }
+}
+
+function sceneFireworks(t, k) {
+  rect(0, 0, W, H, '#0e1030');
+  for (let i = 0; i < 50; i++) circle((i * 97) % W, (i * 61) % 300, 1.3, `rgba(255,255,255,${.4 + .4 * Math.sin(t * 2 + i)})`);
+  // 花火（毎フレーム、時間から粒の位置を計算）
+  const cols = ['#ff7aa2', '#ffd66b', '#7ad0ff', '#a8ff9a', ORANGE];
+  for (let n = 0; n < 5; n++) {
+    const life = ((t * .45 + n * .23) % 1);
+    const cx = 160 + n * 160, cy = 110 + (n * 53 % 90);
+    if (life < .25) { // 打ち上げ
+      circle(cx, lerp(420, cy, life / .25), 3, '#fff'); continue;
+    }
+    const p = (life - .25) / .75;
+    for (let i = 0; i < 24; i++) {
+      const a = i / 24 * Math.PI * 2, r = ease(p) * 80;
+      circle(cx + Math.cos(a) * r, cy + Math.sin(a) * r + p * p * 30, 3 * (1 - p) + .5, cols[n] + Math.floor((1 - p) * 255).toString(16).padStart(2, '0'));
+    }
+  }
+  // 水面の反射と堤防
+  sea(t, 380, '#161a4a', '#0e1030');
+  rect(0, 440, W, 100, '#1f1b30');
+  human(400, 470, t, { long: true, color: '#b48ce0', eyes: 'happy', blush: true, arm: .15, armR: .15 });
+  clawd(530, 470, t, { eyes: 'happy', blush: true });
+  if (k > .4) bubble(300, 250, 'わぁ…きれい');
+  if (k > .65) bubble(470, 300, 'うん、来てよかった');
+}
+
+function sceneAlbum(t, k) {
+  room('#fdf3e7', '#e8d3b8');
+  text('🌺 HONEYMOON ALBUM 🌺', W / 2, 95, 28, ORANGE, 'center', 800);
+  const pics = [['#a9d8f5', '✈️ 出発'], ['#7fd9e0', '🍧 ビーチ'], ['#f08a5d', '🌅 夕焼け'], ['#0e1030', '🎆 花火']];
+  pics.forEach(([c, label], i) => {
+    const kk = Math.min(1, Math.max(0, (k - i * .12) / .15)); if (!kk) return;
+    const x = 150 + i * 200, y = 250;
+    g.save(); g.translate(x, lerp(y - 40, y, ease(kk))); g.rotate((i % 2 ? .06 : -.05)); g.globalAlpha = kk;
+    rect(-80, -90, 160, 190, '#fff'); rect(-70, -80, 140, 130, c);
+    clawd(20, 40, t, { eyes: 'happy', scale: .35 });
+    circle(-25, 10, 14, '#f1c7a1'); rect(-39, 24, 28, 26, '#ffb3c7');
+    text(label, 0, 85, 16, DARK, 'center', 600);
+    g.restore();
+  });
+  if (k > .6) {
+    heart(W / 2, 400, 22 + Math.sin(t * 4) * 2, '#ff6b8f');
+    text('最高の旅だったね ♡', W / 2, 450, 24, DARK, 'center', 700);
+  }
+}
+
+// ---------- Vlog UI 叠加层 ----------
+function overlay(scene, idx, k, t, gt) {
+  // 转场淡入淡出
+  const fade = Math.min(1, k * scene.dur / .4, (1 - k) * scene.dur / .4);
+  rect(0, 0, W, H, `rgba(0,0,0,${1 - fade})`);
+  // 字幕条
+  const a = Math.min(1, k * scene.dur / .8);
+  g.globalAlpha = a;
+  rect(0, H - 80, W, 80, 'rgba(0,0,0,.55)');
+  text(scene.title, 30, H - 46, 26, ORANGE);
+  text(scene.sub, 30, H - 18, 18, '#fff', 'left', 500);
+  g.globalAlpha = 1;
+  // REC 点 + 时间码
+  if ((t * 2 | 0) % 2) circle(34, 30, 8, '#e53935');
+  text('REC', 50, 37, 18, '#fff');
+  const s = gt | 0;
+  text(`00:${String(s / 60 | 0).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`, W - 24, 37, 18, '#fff', 'right');
+  text('ふたりのハネムーン · TRAVEL VLOG', W / 2, 37, 16, '#ffffffcc', 'center', 600);
+  // 取景框四角
+  g.strokeStyle = '#ffffffaa'; g.lineWidth = 3;
+  for (const [cx, cy, dx, dy] of [[14, 56, 1, 1], [W - 14, 56, -1, 1], [14, H - 94, 1, -1], [W - 14, H - 94, -1, -1]]) {
+    g.beginPath(); g.moveTo(cx, cy + dy * 24); g.lineTo(cx, cy); g.lineTo(cx + dx * 24, cy); g.stroke();
+  }
+  // 进度条
+  rect(0, H - 4, W, 4, '#fff3'); rect(0, H - 4, W * gt / TOTAL, 4, ORANGE);
+}
+
+// ---------- 主循环：每帧全量重绘 ----------
+let start = performance.now(), paused = false, pauseAt = 0;
+cv.addEventListener('click', () => {
+  if (paused) start += performance.now() - pauseAt; else pauseAt = performance.now();
+  paused = !paused;
+});
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (paused) return;
+  const gt = ((now - start) / 1000) % TOTAL;
+  let acc = 0, idx = 0;
+  while (gt >= acc + SCENES[idx].dur) acc += SCENES[idx++].dur;
+  const scene = SCENES[idx], local = gt - acc, k = local / scene.dur;
+  g.clearRect(0, 0, W, H);
+  g.save(); scene.draw(gt, k); g.restore();
+  overlay(scene, idx, k, gt, gt);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

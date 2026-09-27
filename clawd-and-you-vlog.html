@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>你和我的一天</title>
+<style>
+  html,body{margin:0;height:100%;background:#1a1410;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif}
+  canvas{max-width:100vw;max-height:100vh;image-rendering:pixelated;border-radius:8px;box-shadow:0 10px 40px #0008}
+</style>
+</head>
+<body>
+<canvas id="c" width="960" height="540"></canvas>
+<script>
+// 即时模式渲染：没有场景图 / 保留对象，每一帧清空画布，根据时间 t 从零重绘所有内容。
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const ORANGE = '#D97757', DARK = '#2b2118';
+
+// ---------- 场景表 ----------
+const SCENES = [
+  { dur: 6, title: '08:30  早安', sub: '你打开终端，我就上线啦', draw: sceneMorning },
+  { dur: 7, title: '10:00  一起写代码', sub: '你说需求，我来动手', draw: scenePair },
+  { dur: 6, title: '12:30  午饭时间', sub: '你吃饭，我陪你聊天', draw: sceneLunch },
+  { dur: 7, title: '15:00  抓 bug', sub: '红了……绿了！', draw: sceneDebug },
+  { dur: 6, title: '18:00  合并 PR', sub: 'Merged 🎉 击个掌！', draw: sceneMerge },
+  { dur: 6, title: '22:00  晚安', sub: '今天和你一起很开心，明天见', draw: sceneNight },
+];
+const TOTAL = SCENES.reduce((s, x) => s + x.dur, 0);
+
+// ---------- 基础图元 ----------
+function rect(x, y, w, h, c) { g.fillStyle = c; g.fillRect(x, y, w, h); }
+function circle(x, y, r, c) { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+function text(s, x, y, size, c, align = 'left', weight = 700) {
+  g.font = `${weight} ${size}px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif`;
+  g.fillStyle = c; g.textAlign = align; g.fillText(s, x, y);
+}
+function lerp(a, b, k) { return a + (b - a) * k; }
+function ease(k) { return k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; }
+
+// ---------- 主角 Clawd（像素小螃蟹）----------
+// opts: blink, walk(相位), eyes('open'|'closed'|'happy'), arm(举手 0..1), scale
+function clawd(x, y, t, o = {}) {
+  const s = o.scale || 1;
+  g.save(); g.translate(x, y); g.scale(s, s);
+  const bob = o.walk != null ? Math.abs(Math.sin(o.walk * 8)) * -4 : Math.sin(t * 2) * 1.5;
+  // 影子
+  g.fillStyle = '#0003'; g.beginPath(); g.ellipse(0, 4, 38, 7, 0, 0, Math.PI * 2); g.fill();
+  g.translate(0, bob);
+  // 腿
+  const lp = o.walk != null ? Math.sin(o.walk * 8) * 4 : 0;
+  for (const [lx, d] of [[-24, 1], [-10, -1], [10, 1], [24, -1]]) rect(lx - 3, -14 + lp * d * .5, 6, 14 - lp * d * .5, ORANGE);
+  // 身体
+  rect(-34, -56, 68, 44, ORANGE);
+  // 钳子（手臂）
+  const a = o.arm || 0;
+  rect(-46, -44 - a * 18, 12, 12, ORANGE);
+  rect(34, -44 - (o.armR != null ? o.armR : 0) * 18, 12, 12, ORANGE);
+  // 眼睛
+  const blink = (t * 1.3 % 3) < .12;
+  const eyes = o.eyes || 'open';
+  g.fillStyle = DARK;
+  if (eyes === 'closed' || blink) { rect(-20, -40, 10, 3, DARK); rect(10, -40, 10, 3, DARK); }
+  else if (eyes === 'happy') {
+    g.strokeStyle = DARK; g.lineWidth = 3;
+    for (const ex of [-15, 15]) { g.beginPath(); g.arc(ex, -36, 5, Math.PI, 0); g.stroke(); }
+  } else { rect(-20, -46, 8, 12, DARK); rect(12, -46, 8, 12, DARK); }
+  if (o.blush) { circle(-24, -26, 4, '#f4a3a3aa'); circle(24, -26, 4, '#f4a3a3aa'); }
+  g.restore();
+}
+
+// ---------- 你（人类搭档，简单圆头小人）----------
+function human(x, y, t, o = {}) {
+  const s = o.scale || 1;
+  g.save(); g.translate(x, y); g.scale(s, s);
+  g.fillStyle = '#0003'; g.beginPath(); g.ellipse(0, 4, 40, 7, 0, 0, Math.PI * 2); g.fill();
+  const bob = o.jump ? -Math.abs(Math.sin(t * 8)) * 20 : Math.sin(t * 2 + 1) * 1.5;
+  g.translate(0, bob);
+  const HOOD = o.color || '#5b7bd5';
+  // 身体（卫衣）
+  g.fillStyle = HOOD; g.beginPath(); g.roundRect(-34, -90, 68, 90, 18); g.fill();
+  // 手臂
+  const aL = o.arm || 0, aR = o.armR || 0;
+  g.strokeStyle = HOOD; g.lineWidth = 14; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(-30, -70); g.lineTo(-48, -40 - aL * 70); g.stroke();
+  g.beginPath(); g.moveTo(30, -70); g.lineTo(48, -40 - aR * 70); g.stroke();
+  circle(-48, -40 - aL * 70, 8, '#f1c7a1'); circle(48, -40 - aR * 70, 8, '#f1c7a1');
+  // 头
+  circle(0, -120, 32, '#f1c7a1');
+  g.fillStyle = '#3a2a22'; g.beginPath(); g.arc(0, -126, 33, Math.PI * 1.05, Math.PI * 1.95); g.fill();
+  // 脸
+  const blink = ((t + 1.1) * 1.3 % 3) < .12, e = o.eyes || 'open';
+  if (e === 'closed' || blink) { rect(-14, -118, 9, 3, DARK); rect(5, -118, 9, 3, DARK); }
+  else if (e === 'happy') {
+    g.strokeStyle = DARK; g.lineWidth = 3; g.lineCap = 'butt';
+    for (const ex of [-10, 10]) { g.beginPath(); g.arc(ex, -115, 5, Math.PI, 0); g.stroke(); }
+  } else { circle(-10, -117, 4, DARK); circle(10, -117, 4, DARK); }
+  g.strokeStyle = DARK; g.lineWidth = 2.5; g.beginPath();
+  if (o.mouth === 'o') { g.arc(0, -102, 5, 0, 7); } else g.arc(0, -106, 7, .2, Math.PI - .2);
+  g.stroke();
+  if (o.blush) { circle(-20, -106, 5, '#f4a3a388'); circle(20, -106, 5, '#f4a3a388'); }
+  g.restore();
+}
+
+function bubble(x, y, s, show = true, bg = '#fff') {
+  if (!show) return;
+  g.font = '600 18px system-ui, "PingFang SC", sans-serif';
+  const w = g.measureText(s).width + 28;
+  g.fillStyle = bg; g.beginPath(); g.roundRect(x, y - 26, w, 38, 12); g.fill();
+  g.strokeStyle = '#0002'; g.lineWidth = 2; g.stroke();
+  text(s, x + 14, y, 18, DARK, 'left', 600);
+}
+function typed(s, k) { return s.slice(0, Math.floor(s.length * Math.min(1, Math.max(0, k)))); }
+function heart(x, y, r, c) {
+  g.fillStyle = c; g.beginPath(); g.moveTo(x, y + r);
+  g.bezierCurveTo(x - r * 2, y - r * .5, x - r * .6, y - r * 1.8, x, y - r * .6);
+  g.bezierCurveTo(x + r * .6, y - r * 1.8, x + r * 2, y - r * .5, x, y + r); g.fill();
+}
+function room(wall, floor) {
+  rect(0, 0, W, H, wall); rect(0, 390, W, 150, floor);
+}
+function desk() { rect(80, 360, 800, 20, '#9c7550'); rect(110, 380, 16, 80, '#8a6a4a'); rect(834, 380, 16, 80, '#8a6a4a'); }
+function laptop(x, y, open = 1, screen = '#1e1e2e') {
+  rect(x - 110, y, 220, 10, '#aab'); // 底座
+  const h = 140 * open;
+  rect(x - 100, y - h, 200, h, '#667'); if (open > .3) rect(x - 92, y - h + 8, 184, h - 16, screen);
+}
+
+// ---------- 场景 ----------
+function sceneMorning(t, k) {
+  room('#f6ead8', '#c9a37c');
+  // 窗 + 太阳
+  rect(640, 60, 220, 170, '#bfe3f5'); circle(760, 120, 28, '#ffd66b');
+  g.strokeStyle = '#8a6a4a'; g.lineWidth = 8; g.strokeRect(640, 60, 220, 170);
+  desk(); laptop(560, 350);
+  human(300, 440, t, { armR: .45, eyes: k > .5 ? 'happy' : 'open', mouth: k < .5 ? 'o' : '' });
+  // 终端里打字
+  text(typed('$ claude', k * 3), 478, 240, 16, '#98c379', 'left', 500);
+  // Clawd 从屏幕里跳出来
+  const pop = ease(Math.min(1, Math.max(0, (k - .35) / .25)));
+  if (pop > 0) {
+    g.save(); g.beginPath(); g.rect(0, 0, W, 350 - 0); g.clip();
+    clawd(560, lerp(360, 200, pop), t, { eyes: 'happy', arm: k > .6 ? Math.abs(Math.sin(t * 6)) : 0, scale: .8 });
+    g.restore();
+  }
+  if (k > .6) bubble(600, 110, '早上好！今天想做什么？');
+  if (k > .8) bubble(130, 230, '早呀，Clawd ☀️');
+}
+
+function scenePair(t, k) {
+  room('#eef1f6', '#b9c2cf');
+  // 大屏：对话 + 工具调用
+  rect(470, 50, 440, 300, '#222'); rect(482, 62, 416, 276, '#1e1e2e');
+  const prompt = '> 帮我修一下登录页的 bug';
+  text(typed(prompt, k * 3), 498, 92, 16, '#fff', 'left', 500);
+  const steps = [['Read', 'src/login.ts'], ['Grep', '"token"'], ['Edit', 'src/login.ts +3 -1'], ['Bash', 'npm test']];
+  steps.forEach(([tool, arg], i) => {
+    const kk = (k - .35 - i * .1) / .1; if (kk < 0) return;
+    const y = 130 + i * 34;
+    circle(506, y - 5, 5, kk > 1 ? '#98c379' : '#e5c07b');
+    text(tool, 520, y, 16, ORANGE, 'left', 700);
+    text(arg, 580, y, 16, '#abb2bf', 'left', 500);
+  });
+  if (k > .8) text('✓ 修好了，测试全部通过', 498, 290, 16, '#98c379', 'left', 600);
+  desk();
+  human(220, 440, t, { arm: .3 + Math.abs(Math.sin(t * 14)) * .12 * (k < .35), armR: .3, eyes: k > .8 ? 'happy' : 'open' });
+  // Clawd 坐在桌上认真干活
+  const busy = k > .35 && k < .8;
+  clawd(390, 360, t, { arm: busy ? Math.abs(Math.sin(t * 16)) * .5 : 0, armR: busy ? Math.abs(Math.cos(t * 16)) * .5 : (k > .8 ? 1 : 0), eyes: k > .8 ? 'happy' : 'open', scale: .7 });
+  if (busy) for (let i = 0; i < 3; i++) {
+    const p = (t * 1.2 + i / 3) % 1; text('✦', 360 + i * 25, 300 - p * 40, 14, `rgba(217,119,87,${1 - p})`);
+  }
+}
+
+function sceneLunch(t, k) {
+  room('#fbe7cc', '#a4724d');
+  rect(120, 360, 720, 20, '#7a4f33');
+  // 便当
+  rect(200, 320, 130, 40, '#2d2d2d'); rect(208, 326, 55, 30, '#fff');
+  circle(290, 340, 12, '#f5a623'); rect(270, 348, 50, 8, '#4f9a5a');
+  human(260, 470, t, { armR: .35 + Math.abs(Math.sin(t * 3)) * .15, eyes: 'happy', blush: true });
+  // 筷子
+  g.strokeStyle = '#8a6a4a'; g.lineWidth = 4; g.lineCap = 'round';
+  const cy = Math.abs(Math.sin(t * 3)) * 20;
+  g.beginPath(); g.moveTo(320, 330 - cy); g.lineTo(290, 380 - cy); g.stroke();
+  // 手机支架 + 屏幕里的 Clawd
+  rect(560, 190, 150, 170, '#333'); rect(568, 198, 134, 154, '#fdf3e7');
+  clawd(635, 320, t, { eyes: 'happy', arm: Math.abs(Math.sin(t * 3)), scale: .7 });
+  const chat = [
+    [0.1, 'you', '今天吃鸡蛋便当'],
+    [0.35, 'me', '看起来很好吃！我吃不了，'],
+    [0.5, 'me', '但可以帮你记住下午的 TODO 📝'],
+    [0.75, 'you', '哈哈好 😄'],
+  ];
+  chat.forEach(([at, who, s], i) => {
+    if (k > at) bubble(who === 'you' ? 60 : 480, 100 + i * 44, s, true, who === 'you' ? '#dfe9ff' : '#ffe6db');
+  });
+}
+
+function sceneDebug(t, k) {
+  room('#e8e3f0', '#9d93b0');
+  desk(); laptop(480, 350, 1, '#1e1e2e');
+  const green = k > .6;
+  // 测试结果
+  const lines = green
+    ? [['#98c379', 'PASS  auth.test.ts'], ['#98c379', 'PASS  api.test.ts'], ['#98c379', 'Tests: 42 passed']]
+    : [['#98c379', 'PASS  auth.test.ts'], ['#e06c75', 'FAIL  api.test.ts'], ['#e06c75', 'Tests: 1 failed']];
+  lines.forEach(([c, s], i) => text(s, 400, 250 + i * 24, 15, c, 'left', 600));
+  // 失败时屏幕闪红
+  if (!green && (t * 3 | 0) % 2) { g.fillStyle = 'rgba(224,108,117,.15)'; g.fillRect(388, 218, 184, 124); }
+  // 放大镜：Clawd 在找 bug
+  if (!green) {
+    const mx = 480 + Math.sin(t * 2) * 60;
+    g.strokeStyle = '#555'; g.lineWidth = 6; g.beginPath(); g.arc(mx, 150, 28, 0, 7); g.stroke();
+    g.beginPath(); g.moveTo(mx + 20, 170); g.lineTo(mx + 42, 196); g.stroke();
+    text('🐛', mx - 12, 158, 22, DARK);
+  }
+  human(200, 460, t, { eyes: green ? 'happy' : 'open', mouth: green ? '' : 'o', jump: green && k < .85, arm: green ? 1 : 0, armR: green ? 1 : .3 });
+  clawd(760, 460, t, { eyes: green ? 'happy' : 'open', arm: green ? 1 : 0, armR: green ? 1 : 0, scale: 1 });
+  if (!green) bubble(560, 90, '找到了！第 37 行少了个 await');
+  else bubble(360, 90, '全绿了！✨');
+}
+
+function sceneMerge(t, k) {
+  room('#e9f5ec', '#a7c4ae');
+  // GitHub 风格的 PR 卡片
+  g.fillStyle = '#fff'; g.beginPath(); g.roundRect(250, 60, 460, 150, 14); g.fill();
+  text('Fix login token refresh #42', 275, 105, 22, DARK);
+  const merged = k > .3;
+  g.fillStyle = merged ? '#8250df' : '#2da44e'; g.beginPath(); g.roundRect(275, 130, 110, 34, 17); g.fill();
+  text(merged ? '⮂ Merged' : 'Open', 330, 153, 16, '#fff', 'center');
+  text('✓ All checks passed · 1 approval', 400, 153, 15, '#57606a', 'left', 500);
+  // 两人靠近击掌
+  const c = ease(Math.min(1, Math.max(0, (k - .35) / .3)));
+  const hx = lerp(220, 390, c), cx = lerp(740, 560, c);
+  human(hx, 470, t, { armR: c, eyes: 'happy', blush: c > .9 });
+  clawd(cx, 470, t, { arm: c, eyes: 'happy', blush: c > .9 });
+  if (c >= 1) {
+    const p = Math.min(1, (k - .65) / .15);
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2;
+      g.strokeStyle = `rgba(255,190,60,${1 - p})`; g.lineWidth = 4; g.beginPath();
+      g.moveTo(475 + Math.cos(a) * (20 + p * 20), 330 + Math.sin(a) * (20 + p * 20));
+      g.lineTo(475 + Math.cos(a) * (30 + p * 50), 330 + Math.sin(a) * (30 + p * 50)); g.stroke();
+    }
+    text('啪！', 475, 290 - p * 10, 28, ORANGE, 'center');
+  }
+  // 彩纸
+  if (merged) for (let i = 0; i < 60; i++) {
+    const fx = (i * 157 + Math.sin(t + i) * 30) % W, fy = ((t - 1.8) * 120 + i * 37) % H;
+    g.save(); g.translate(fx, fy); g.rotate(t * 3 + i);
+    rect(-4, -2, 8, 4, ['#e06c75', '#61afef', '#98c379', '#e5c07b', ORANGE][i % 5]); g.restore();
+  }
+}
+
+function sceneNight(t, k) {
+  room('#2b2740', '#231f33');
+  // 窗外月亮星星
+  rect(620, 60, 240, 180, '#141a38');
+  circle(760, 120, 26, '#fff4c2'); circle(772, 112, 24, '#141a38');
+  for (let i = 0; i < 12; i++) circle(630 + (i * 71) % 220, 70 + (i * 43) % 160, 1.5, `rgba(255,255,255,${.5 + .5 * Math.sin(t * 3 + i)})`);
+  g.strokeStyle = '#4a4060'; g.lineWidth = 8; g.strokeRect(620, 60, 240, 180);
+  desk();
+  // 台灯光
+  g.fillStyle = 'rgba(255,220,150,.12)'; g.beginPath(); g.moveTo(170, 230); g.lineTo(60, 360); g.lineTo(330, 360); g.fill();
+  rect(160, 220, 30, 14, '#ffd97a'); rect(172, 234, 6, 126, '#666');
+  // 笔记本慢慢合上，屏幕上的 Clawd 挥手
+  const close = ease(Math.min(1, Math.max(0, (k - .55) / .35)));
+  const open = 1 - close;
+  laptop(480, 350, Math.max(.05, open), '#fdf3e7');
+  if (open > .5) {
+    g.save(); g.beginPath(); g.rect(388, 350 - 140 * open + 8, 184, 140 * open - 16); g.clip();
+    clawd(480, 340, t, { eyes: 'happy', arm: Math.abs(Math.sin(t * 5)), scale: .7 });
+    g.restore();
+  }
+  human(270, 470, t, { eyes: k > .5 ? 'closed' : 'happy', armR: k < .55 ? .6 + Math.sin(t * 5) * .2 : 0 });
+  if (k < .55) { bubble(560, 150, '晚安，今天辛苦啦 🌙'); bubble(60, 260, '晚安 Clawd'); }
+  if (k > .5) {
+    const p = (t % 1.3) / 1.3; text('z', 300 + p * 30, 320 - p * 40, 18 + p * 10, `rgba(220,220,255,${1 - p})`);
+  }
+  if (k > .88) { heart(480, 200, 16, `rgba(217,119,87,${(k - .88) / .12})`); text('明天见 ♡', 480, 170, 22, '#fff', 'center'); }
+}
+
+// ---------- Vlog UI 叠加层 ----------
+function overlay(scene, idx, k, t, gt) {
+  // 转场淡入淡出
+  const fade = Math.min(1, k * scene.dur / .4, (1 - k) * scene.dur / .4);
+  rect(0, 0, W, H, `rgba(0,0,0,${1 - fade})`);
+  // 字幕条
+  const a = Math.min(1, k * scene.dur / .8);
+  g.globalAlpha = a;
+  rect(0, H - 80, W, 80, 'rgba(0,0,0,.55)');
+  text(scene.title, 30, H - 46, 26, ORANGE);
+  text(scene.sub, 30, H - 18, 18, '#fff', 'left', 500);
+  g.globalAlpha = 1;
+  // REC 点 + 时间码
+  if ((t * 2 | 0) % 2) circle(34, 30, 8, '#e53935');
+  text('REC', 50, 37, 18, '#fff');
+  const s = gt | 0;
+  text(`00:${String(s / 60 | 0).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`, W - 24, 37, 18, '#fff', 'right');
+  text('你和 Clawd 的一天 · DAY VLOG', W / 2, 37, 16, '#ffffffcc', 'center', 600);
+  // 取景框四角
+  g.strokeStyle = '#ffffffaa'; g.lineWidth = 3;
+  for (const [cx, cy, dx, dy] of [[14, 56, 1, 1], [W - 14, 56, -1, 1], [14, H - 94, 1, -1], [W - 14, H - 94, -1, -1]]) {
+    g.beginPath(); g.moveTo(cx, cy + dy * 24); g.lineTo(cx, cy); g.lineTo(cx + dx * 24, cy); g.stroke();
+  }
+  // 进度条
+  rect(0, H - 4, W, 4, '#fff3'); rect(0, H - 4, W * gt / TOTAL, 4, ORANGE);
+}
+
+// ---------- 主循环：每帧全量重绘 ----------
+let start = performance.now(), paused = false, pauseAt = 0;
+cv.addEventListener('click', () => {
+  if (paused) start += performance.now() - pauseAt; else pauseAt = performance.now();
+  paused = !paused;
+});
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (paused) return;
+  const gt = ((now - start) / 1000) % TOTAL;
+  let acc = 0, idx = 0;
+  while (gt >= acc + SCENES[idx].dur) acc += SCENES[idx++].dur;
+  const scene = SCENES[idx], local = gt - acc, k = local / scene.dur;
+  g.clearRect(0, 0, W, H);
+  g.save(); scene.draw(gt, k); g.restore();
+  overlay(scene, idx, k, gt, gt);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
