@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clawd 护理实习 Vlog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=ZCOOL+QingKe+HuangYou&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#141B2B; --panel:#1E2839; --line:#2E3B54; --ink:#ECE8DF; --muted:#9AA6B8;
+  --teal:#6CC4B2; --orange:#D97757; --rec:#E5484D;
+  --pixel:"Press Start 2P", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --display:"ZCOOL QingKe HuangYou", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --body:"Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.65}
+.wrap{max-width:980px;margin:0 auto;padding-inline:16px;padding-block:28px 40px;display:flex;flex-direction:column;gap:20px}
+header{display:flex;flex-direction:column;gap:6px}
+.eyebrow{font-family:var(--pixel);font-size:10px;letter-spacing:.12em;color:var(--teal)}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,6vw,48px);line-height:1.1;margin:0;text-wrap:balance}
+h1 span{color:var(--orange)}
+.lead{margin:0;color:var(--muted);max-width:62ch}
+
+.player{position:relative;container-type:inline-size;border:3px solid var(--line);background:#000;box-shadow:6px 6px 0 #0B101B}
+canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;image-rendering:pixelated;image-rendering:crisp-edges}
+.scan{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.10) 2px 3px)}
+.hud{position:absolute;inset:0;pointer-events:none;font-family:var(--pixel);font-size:max(8px,1.5cqw);color:#fff;text-shadow:1px 1px 0 #000}
+.hud .tl{position:absolute;left:2.4cqw;top:2.4cqw;display:flex;flex-direction:column;gap:1.2cqw}
+.hud .tr{position:absolute;right:2.4cqw;top:2.4cqw;text-align:right;display:flex;flex-direction:column;gap:1.2cqw}
+.rec{display:flex;align-items:center;gap:.8em}
+.dot{width:.9em;height:.9em;background:var(--rec);display:inline-block}
+.rec.paused .dot{background:transparent;border-left:.3em solid #fff;border-right:.3em solid #fff;width:.9em}
+.blink{animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.sub{position:absolute;left:50%;bottom:3cqw;transform:translateX(-50%);width:max-content;max-width:88%;
+  font-family:var(--body);font-weight:500;font-size:max(12px,2.7cqw);line-height:1.45;text-align:center;
+  background:rgba(12,16,26,.78);padding:.35em .8em;border:2px solid rgba(255,255,255,.14);text-shadow:none;min-height:2.2em}
+.sub:empty{visibility:hidden}
+
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.btn{font-family:var(--body);font-size:14px;font-weight:500;color:var(--ink);background:var(--panel);border:2px solid var(--line);
+  padding:8px 14px;cursor:pointer;box-shadow:3px 3px 0 #0B101B;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{border-color:var(--teal)}
+.btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #0B101B}
+.btn:focus-visible,.chap:focus-visible,.seg:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.btn.primary{background:var(--teal);color:#10231F;border-color:var(--teal)}
+.count{margin-left:auto;font-family:var(--pixel);font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.track{display:grid;grid-template-columns:repeat(9,1fr);gap:4px}
+.seg{height:10px;background:var(--panel);border:0;padding:0;cursor:pointer;position:relative}
+.seg i{position:absolute;inset:0 auto 0 0;width:0;background:var(--orange)}
+
+.chapters{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.chap{width:100%;text-align:left;background:var(--panel);border:2px solid var(--line);color:var(--ink);cursor:pointer;
+  padding:10px 12px;display:flex;flex-direction:column;gap:4px;font-family:var(--body)}
+.chap:hover{border-color:var(--teal)}
+.chap b{font-family:var(--pixel);font-weight:400;font-size:10px;color:var(--teal);font-variant-numeric:tabular-nums}
+.chap span{font-size:15px}
+.chap[aria-current="true"]{border-color:var(--orange);background:#2A2A33}
+.chap[aria-current="true"] b{color:var(--orange)}
+footer{color:var(--muted);font-size:13px}
+kbd{font-family:var(--pixel);font-size:9px;border:1px solid var(--line);padding:2px 5px;background:var(--panel)}
+@media (max-width:520px){.chap{padding:8px}.chap span{font-size:13px}.btn{padding:8px 10px}}
+@media (prefers-reduced-motion: reduce){.blink{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">PIXEL VLOG · DAY 12</div>
+    <h1><span>Clawd</span> 护理实习的一天</h1>
+    <p class="lead">跟着 Clawd 在内科病房实习一天，从 06:30 的闹钟到 22:40 的复习。全片约一分钟，循环播放。</p>
+  </header>
+
+  <div class="player">
+    <canvas id="screen" width="160" height="90" aria-label="像素动画：Clawd 护理实习的一天"></canvas>
+    <div class="scan"></div>
+    <div class="hud">
+      <div class="tl">
+        <div class="rec" id="rec"><i class="dot blink"></i><span id="recLabel">REC</span></div>
+        <div id="tc">06:30:00</div>
+      </div>
+      <div class="tr">
+        <div>DAY 12</div>
+        <div id="chapNo">01/09</div>
+      </div>
+      <div class="sub" id="sub" aria-live="off"></div>
+    </div>
+  </div>
+
+  <div class="track" id="track"></div>
+
+  <div class="controls">
+    <button class="btn" id="prev" type="button">◀◀ 上一段</button>
+    <button class="btn primary" id="play" type="button">❚❚ 暂停</button>
+    <button class="btn" id="next" type="button">下一段 ▶▶</button>
+    <span class="count" id="count">01 / 09</span>
+  </div>
+
+  <ol class="chapters" id="chapters"></ol>
+
+  <footer>画面由 canvas 以 160×90 像素实时绘制。快捷键：<kbd>空格</kbd> 播放 / 暂停，<kbd>←</kbd> <kbd>→</kbd> 切换片段。</footer>
+</div>
+
+<script>
+(() => {
+const W = 160, H = 90, DUR = 6.5;
+const cv = document.getElementById('screen');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+const K = '#1B1B1F', WHITE = '#FFFFFF', RED = '#E0525A', TEAL = '#5FB8A8', ORANGE = '#D97757',
+      PAPER = '#F2EEE6', YEL = '#F2C94C', GREEN = '#4CAF6E';
+
+function R(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
+function disc(cx, cy, r, c) { for (let dy = -r; dy <= r; dy++) { const w = Math.floor(Math.sqrt(r * r - dy * dy)); R(cx - w, cy + dy, 2 * w + 1, 1, c); } }
+function line(x0, y0, x1, y1, c) {
+  x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let e = dx + dy;
+  for (;;) { R(x0, y0, 1, 1, c); if (x0 === x1 && y0 === y1) break; const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; } }
+}
+function bands(x, y, w, h, cols) { const bh = h / cols.length; cols.forEach((c, i) => R(x, y + Math.floor(i * bh), w, Math.ceil(bh), c)); }
+const lerp = (a, b, p) => a + (b - a) * p;
+const clamp01 = p => Math.max(0, Math.min(1, p));
+
+// 3x5 pixel font
+const G = {
+  '0':'111101101101111','1':'010110010010111','2':'111001111100111','3':'111001111001111','4':'101101111001001',
+  '5':'111100111001111','6':'111100111101111','7':'111001010010010','8':'111101111101111','9':'111101111001111',
+  ':':'000010000010000','/':'001001010100100','.':'000000000000010','%':'101001010100101','-':'000000111000000',
+  '+':'000010111010000','!':'010010010000010','?':'111001011000010',
+  A:'010101111101101',B:'110101110101110',C:'011100100100011',D:'110101101101110',E:'111100110100111',F:'111100110100100',
+  G:'011100101101011',H:'101101111101101',I:'111010010010111',K:'101101110101101',L:'100100100100111',M:'101111111101101',
+  N:'110101101101101',O:'010101101101010',P:'110101110100100',R:'110101110101101',S:'011100010001110',T:'111010010010010',
+  U:'101101101101111',V:'101101101101010',W:'101101111111101',Y:'101101010010010',Z:'111001010100111'
+};
+function txt(s, x, y, c) {
+  s = String(s).toUpperCase();
+  for (let i = 0; i < s.length; i++) { const g = G[s[i]]; if (!g) continue;
+    for (let k = 0; k < 15; k++) if (g[k] === '1') R(x + i * 4 + k % 3, y + (k / 3 | 0), 1, 1, c); }
+}
+const txtW = s => String(s).length * 4 - 1;
+
+// Clawd: 14x10 sprite, optional nurse cap (4 rows above)
+function clawd(x, y, o = {}) {
+  x = Math.round(x); y = Math.round(y);
+  const b = o.body || ORANGE, fl = !!o.flip, sc = o.scrubs;
+  const P = (px, py, w, h, c) => R(fl ? x + 14 - px - w : x + px, y + py, w, h, c);
+  [3, 5, 8, 10].forEach((lx, i) => { const up = o.walk && ((i + o.frame) % 2 === 0) ? 1 : 0; P(lx, 8, 1, 2 - up, sc || b); });
+  P(2, 0, 10, 8, b);
+  if (o.armsUp) { P(0, 1, 2, 3, b); P(12, 1, 2, 3, b); }
+  else { P(0, 4, 2, 2, b); P(12, 4 + (o.armDY || 0), 2, 2, b); }
+  if (sc) { P(2, 5, 10, 3, sc); P(6, 5, 2, 1, b); P(4, 6, 1, 1, WHITE); P(9, 6, 1, 1, o.pen || '#3A6FB0'); }
+  if (o.glasses) { P(3, 2, 3, 2, '#BFE3F5'); P(8, 2, 3, 2, '#BFE3F5'); P(6, 2, 2, 1, K); }
+  if (o.brows) { P(3, 1, 2, 1, WHITE); P(9, 1, 2, 1, WHITE); }
+  if (o.happy) { [[3,3],[4,2],[5,3],[8,3],[9,2],[10,3]].forEach(([a, c]) => P(a, c, 1, 1, K)); P(2, 4, 1, 1, '#F4A6A0'); P(11, 4, 1, 1, '#F4A6A0'); }
+  else if (o.blink) { P(3, 3, 2, 1, K); P(9, 3, 2, 1, K); }
+  else { P(4, 2, 1, 2, K); P(9, 2, 1, 2, K); }
+  if (o.cap) { P(4, -4, 6, 1, WHITE); P(3, -3, 8, 2, WHITE); P(2, -1, 10, 1, WHITE); P(6, -4, 2, 3, RED); P(5, -3, 4, 1, RED); }
+}
+const blinkAt = t => (t % 3.1) > 2.95;
+const NURSE = { cap: true, scrubs: TEAL };
+const TEACHER = { cap: true, scrubs: '#3E5C8A', glasses: true, body: '#C4674A', pen: RED };
+const PATIENT = { body: '#C9BBA8', brows: true };
+
+function heart(x, y, c = RED) { ['01010', '11111', '01110', '00100'].forEach((r, j) => { for (let i = 0; i < 5; i++) if (r[i] === '1') R(x + i, y + j, 1, 1, c); }); }
+function bubble(x, y, w, h, tailX) { R(x + 1, y, w - 2, h, WHITE); R(x, y + 1, w, h - 2, WHITE); R(tailX, y + h, 2, 1, WHITE); R(tailX + 1, y + h + 1, 1, 1, WHITE); }
+
+// shared ward background (bed + patient)
+function ward(t, pat = {}) {
+  R(0, 0, W, 72, '#E3ECE8'); R(0, 50, W, 2, '#C6D6D0');
+  R(0, 72, W, 18, '#AFC0BA'); for (let i = 0; i < W; i += 12) R(i, 72, 1, 18, '#9DB0AA');
+  R(0, 0, 10, 72, '#B9D7E8'); for (let y = 0; y < 72; y += 6) R(3, y, 1, 4, '#A2C6DA');
+  R(128, 46, 5, 26, '#8FA09B');
+  R(62, 66, 3, 6, '#8FA09B'); R(124, 66, 3, 6, '#8FA09B');
+  R(60, 60, 70, 6, PAPER);
+  R(112, 52, 14, 8, WHITE);
+  const flip = pat.flip !== undefined ? pat.flip : true;
+  clawd(100 + (pat.dx || 0), 49 + (pat.dy || 0), { ...PATIENT, flip, happy: pat.happy, blink: !pat.happy && blinkAt(t + 1) });
+  R(70, 57, 58, 7, '#7FA7D9'); R(70, 57, 58, 1, '#A8C5EA'); R(70, 63, 58, 1, '#6A92C4');
+  txt('3', 116, 66, '#6A7A76');
+}
+
+// ---------- scenes ----------
+function s1(t) { // 06:30 wake up
+  R(0, 0, W, 72, '#2B3350'); R(0, 72, W, 18, '#6B4A3A');
+  for (let x = 0; x < W; x += 16) R(x, 72, 1, 18, '#5A3D30'); R(0, 80, W, 1, '#5A3D30');
+  R(40, 18, 14, 18, '#3A4468'); R(42, 20, 10, 6, '#D97757'); R(42, 28, 10, 1, '#8A93B8'); R(42, 31, 7, 1, '#8A93B8');
+  R(94, 10, 40, 32, '#C9B79C');
+  ctx.save(); ctx.beginPath(); ctx.rect(96, 12, 36, 28); ctx.clip();
+  bands(96, 12, 36, 28, ['#3A3F6B', '#6D5A8C', '#C9728A', '#F2A65A']);
+  disc(114, Math.round(44 - Math.min(t, 6) * 1.6), 5, '#FFD27A');
+  ctx.restore();
+  R(113, 12, 2, 28, '#C9B79C'); R(96, 25, 36, 2, '#C9B79C');
+  R(8, 48, 5, 24, '#8A5A44'); R(10, 62, 64, 6, '#8A5A44'); R(12, 68, 3, 4, '#8A5A44'); R(69, 68, 3, 4, '#8A5A44');
+  R(13, 58, 60, 4, '#E8E2D4'); R(14, 52, 14, 6, WHITE);
+  const blanket = () => { R(13, 53, 60, 6, TEAL); for (let x = 16; x < 72; x += 6) R(x, 55 + (x / 6 % 2), 2, 1, '#8FD1C4'); };
+  // nightstand + alarm clock
+  R(78, 60, 14, 12, '#7A5040'); R(80, 65, 10, 1, '#5E3C30'); R(84, 67, 2, 1, '#C9A77C');
+  const ring = t < 2.4, dx = ring ? ((t * 20 | 0) % 2 ? 1 : -1) : 0;
+  R(81 + dx, 50, 2, 2, RED); R(88 + dx, 50, 2, 2, RED);
+  R(81 + dx, 52, 9, 7, RED); R(82 + dx, 53, 7, 5, PAPER); R(85 + dx, 54, 1, 2, K); R(85 + dx, 55, 2, 1, K);
+  if (ring && (t * 6 | 0) % 2) { R(77, 49, 1, 3, YEL); R(93, 49, 1, 3, YEL); R(79, 45, 1, 2, YEL); R(91, 45, 1, 2, YEL); R(85, 44, 1, 2, YEL); }
+  if (t < 2.2) {
+    clawd(22, 46, { blink: t < 1.3 });
+    blanket();
+    if (t < 1.3) txt('Z', 36, Math.round(40 - t * 5), '#BFC6E0');
+    if (t > 1.4) txt('!', 38, 38, YEL);
+  } else if (t < 3) {
+    blanket();
+    const p = (t - 2.2) / 0.8;
+    clawd(lerp(22, 44, p), lerp(46, 62, p) - Math.sin(Math.PI * p) * 14, { armsUp: true });
+  } else {
+    blanket();
+    const stretch = t < 4.6 && (t % 1) < 0.55;
+    const hop = t > 4.6 ? ((t * 4 | 0) % 2) : 0;
+    clawd(44, 62 - hop, { armsUp: stretch || hop === 1, happy: t > 4.6, blink: stretch });
+  }
+}
+
+function s2(t) { // 07:20 handover
+  R(0, 0, W, 72, '#D6E6E1'); R(0, 0, W, 3, '#B9CFC8');
+  R(0, 72, W, 18, '#9FB3B0'); for (let i = 0; i < W; i += 10) R(i, 72, 1, 18, '#8EA3A0'); R(0, 81, W, 1, '#8EA3A0');
+  R(14, 10, 52, 32, '#9AA7A4'); R(16, 12, 48, 28, WHITE);
+  const bars = ['#3A6FB0', RED, TEAL, '#3A6FB0', ORANGE];
+  for (let i = 0; i < 5; i++) { txt(String(i + 1), 19, 14 + i * 5, '#3A4252'); R(25, 16 + i * 5, 10 + (i * 13) % 26, 1, bars[i]); }
+  disc(80, 16, 5, '#9AA7A4'); disc(80, 16, 4, WHITE); R(80, 13, 1, 4, K); R(80, 16, 3, 1, K);
+  R(100, 50, 60, 2, TEAL); R(100, 52, 60, 20, PAPER); R(100, 60, 60, 1, '#D9D2C2');
+  R(140, 43, 3, 7, '#3A6FB0'); R(144, 44, 3, 6, RED); R(148, 43, 3, 7, TEAL);
+  clawd(120, 62, { ...TEACHER, flip: true, blink: blinkAt(t) });
+  const x = Math.min(84, -14 + t * 42), walking = x < 84;
+  const nod = t > 4.6 && t < 5.8 ? ((t * 4 | 0) % 2) : 0;
+  clawd(x, 62 + nod, { ...NURSE, walk: walking, frame: t * 8 | 0, blink: !walking && blinkAt(t + .5), happy: t > 5.8 });
+  if (t > 4.2) { R(98, 64, 5, 6, WHITE); R(99, 66, 3, 1, '#9AA7A4'); R(99, 68, 3, 1, '#9AA7A4'); }
+  if (t > 2.6 && t < 5.2) { bubble(106, 38, 22, 10, 120); const n = (t * 3 | 0) % 4; for (let i = 0; i < n; i++) R(111 + i * 4, 42, 2, 2, '#3A4252'); }
+  if (t > 5.2) { bubble(78, 42, 14, 10, 88); txt('OK', 81, 45, GREEN); }
+}
+
+function ecg(p) {
+  if (p > .20 && p < .28) return -1; if (p > .40 && p < .43) return -7; if (p > .43 && p < .46) return 2; if (p > .60 && p < .70) return -2; return 0;
+}
+function s3(t) { // 08:00 vitals
+  ward(t, { happy: t > 4.2 });
+  R(18, 10, 40, 32, '#3A4252'); R(20, 12, 36, 28, '#0F1F1B');
+  let py = null;
+  for (let i = 0; i < 34; i++) { const y = 20 + ecg(((i + t * 30) / 17) % 1); if (py !== null) line(20 + i, py, 21 + i, y, '#6BE38F'); py = y; }
+  txt('HR 76', 22, 28, '#6BE38F'); txt('BP118/76', 22, 34, YEL);
+  if ((t * 2 | 0) % 2) R(52, 13, 2, 2, RED);
+  clawd(80, 62, { ...NURSE, blink: blinkAt(t), happy: t > 4.6 });
+  R(94, 66, 5, 1, WHITE); R(99, 66, 1, 1, RED);
+  if (t > 3) { bubble(92, 30, 22, 11, 104); txt('36.8', 95, 33, '#3A4252'); if (t > 3.6) { R(112, 26, 1, 1, GREEN); R(113, 27, 1, 1, GREEN); R(114, 26, 1, 1, GREEN); R(115, 25, 1, 1, GREEN); } }
+}
+
+function s4(t) { // 09:30 IV + check
+  ward(t, {});
+  R(140, 12, 1, 60, '#8FA09B'); R(136, 12, 9, 1, '#8FA09B'); R(136, 71, 9, 1, '#8FA09B');
+  R(137, 13, 7, 11, '#D8EEF7'); R(138, 16 + Math.floor(t * 0.5), 5, 7 - Math.floor(t * 0.5), '#A9D6EC');
+  R(139, 25, 3, 5, '#D8EEF7'); R(140, 25 + Math.floor(((t * 1.6) % 1) * 4), 1, 1, '#3F8FC6');
+  line(140, 30, 140, 44, '#CFE0E8'); line(140, 44, 114, 56, '#CFE0E8');
+  R(4, 10, 40, 50, '#C9C2B0'); R(5, 11, 38, 48, '#FBF8F0'); R(18, 8, 12, 4, '#8FA09B');
+  txt('CHECK', 14, 14, '#3A4252');
+  for (let i = 0; i < 7; i++) {
+    const y = 23 + i * 5; R(9, y, 3, 3, '#B8B09C'); R(10, y + 1, 1, 1, '#FBF8F0'); R(15, y + 1, 14 + (i * 7) % 12, 1, '#A59D8A');
+    if (t > 0.8 + i * 0.55) { R(9, y + 1, 1, 1, GREEN); R(10, y + 2, 1, 1, GREEN); R(11, y + 1, 1, 1, GREEN); R(12, y, 1, 1, GREEN); }
+  }
+  clawd(56, 62, { ...NURSE, blink: blinkAt(t), happy: t > 4.8 });
+  if (t > 4.8) { R(20, 48, 16, 8, GREEN); txt('OK', 24, 50, WHITE); }
+}
+
+function s5(t) { // 12:10 lunch
+  R(0, 0, W, 72, '#F0E1C6'); R(0, 6, W, 22, '#D9C4A0'); R(2, 8, W - 4, 18, '#BFE3F5');
+  for (let x = 2; x < W; x += 26) R(x, 8, 2, 18, '#D9C4A0'); R(20, 12, 12, 3, WHITE); R(90, 16, 16, 3, WHITE);
+  R(0, 72, W, 18, '#C9A77C'); for (let i = 0; i < W; i += 14) R(i, 72, 1, 18, '#B8956A');
+  clawd(73, 36, { scrubs: TEAL, blink: blinkAt(t), happy: t > 2.5 && t < 4.4 });
+  R(30, 50, 100, 4, '#8C6A4F'); R(30, 54, 100, 2, '#6E5240'); R(34, 56, 3, 16, '#6E5240'); R(123, 56, 3, 16, '#6E5240');
+  R(56, 47, 48, 3, '#9DB7B2');
+  R(62, 44, 10, 3, PAPER); R(62, 44, 10, 1, '#7FA7D9');
+  const rice = Math.max(0, 3 - Math.floor(t / 1.6)); if (rice) R(63, 44 - rice, 8, rice, WHITE);
+  R(84, 46, 14, 1, WHITE);
+  if (t < 3.4) { R(86, 44, 3, 2, RED); R(92, 44, 2, 2, RED); } if (t < 4.6) { R(89, 45, 3, 1, YEL); R(94, 45, 2, 1, YEL); }
+  const up = Math.sin(t * 7) > 0;
+  const hx = 86, hy = 43;
+  if (up) { line(hx, hy, 80, 40, '#8C6A4F'); line(hx, hy + 1, 80, 41, '#A07855'); R(80, 39, 1, 1, WHITE); }
+  else { line(hx, hy, 70, 42, '#8C6A4F'); line(hx, hy + 1, 70, 43, '#A07855'); }
+  for (let k = 0; k < 3; k++) { const s = (t * 5 + k * 2.7) % 8; R(88 + k * 3 + (Math.sin(t * 3 + k) > 0 ? 1 : 0), 42 - s, 1, 1, 'rgba(255,255,255,0.8)'); }
+  const buzz = t > 4.5, bdx = buzz ? ((t * 24 | 0) % 2) : 0;
+  R(110 + bdx, 46, 6, 4, '#2E3440'); R(111 + bdx, 47, 4, 2, buzz ? '#8FE3FF' : '#3A4252');
+  if (buzz) { txt('!', 112, 38, RED); R(108, 44, 1, 2, RED); R(118, 44, 1, 2, RED); }
+}
+
+function s6(t) { // 14:00 charting
+  R(0, 0, W, 72, '#DCE4EC'); R(0, 50, W, 22, '#C3CFDB'); R(0, 72, W, 18, '#8E9AAF');
+  R(10, 12, 32, 24, '#8C6A4F'); R(11, 13, 30, 22, '#C49A6C');
+  R(14, 16, 8, 7, YEL); R(25, 15, 9, 8, '#9DD4C8'); R(16, 25, 10, 7, '#F4A6A0'); R(30, 25, 8, 7, WHITE);
+  R(69, 25, 44, 30, '#2E3440'); R(71, 27, 40, 26, '#16324F'); R(88, 55, 6, 4, '#2E3440');
+  R(106, 24, 7, 6, YEL);
+  const lines = ['T 36.8', 'P76 R18', 'BP118/76', 'IV OK'];
+  let left = Math.floor(Math.max(0, t - 0.5) * 7), cx = 73, cy = 29;
+  for (let i = 0; i < lines.length; i++) {
+    const s = lines[i].slice(0, Math.max(0, left)); txt(s, 73, 29 + i * 6, '#BFE3F5');
+    if (left > 0 && left <= lines[i].length) { cx = 73 + s.length * 4; cy = 29 + i * 6; }
+    else if (left > lines[i].length) { cx = 73; cy = 29 + (i + 1) * 6; }
+    left -= lines[i].length + 1;
+  }
+  if (cy < 53 && (t * 2 | 0) % 2) R(cx, cy, 3, 5, '#6CC4B2');
+  const typing = t < 5;
+  clawd(48, 48, { ...NURSE, blink: blinkAt(t), armDY: typing ? ((t * 10 | 0) % 2) : 0, happy: t > 5.4 });
+  R(20, 58, 124, 3, '#A07855'); R(20, 61, 124, 11, '#8A6448'); R(22, 63, 120, 1, '#7A5640');
+  R(60, 56, 14, 2, '#C7CED8');
+  R(124, 52, 5, 6, PAPER); R(129, 54, 1, 2, PAPER); R(125, 52, 3, 1, '#6E5240');
+  for (let k = 0; k < 3; k++) { const s = (t * 6 + k * 3) % 8; R(125 + k + (Math.sin(t * 4 + k) > 0 ? 1 : 0), 50 - s, 1, 1, 'rgba(255,255,255,0.75)'); }
+}
+
+function s7(t) { // 15:30 turn + pat back
+  let pdy = 0, pflip = true;
+  if (t > 1.8 && t < 2.6) { const p = (t - 1.8) / 0.8; pdy = -Math.round(Math.sin(Math.PI * p) * 5); pflip = p < 0.5; }
+  else if (t >= 2.6) pflip = false;
+  ward(t, { flip: pflip, dy: pdy, happy: t > 3.6 });
+  const x = Math.min(84, 16 + t * 40), walking = x < 84;
+  const pat = t > 2.6 && t < 4.6;
+  clawd(x, 62, { ...NURSE, walk: walking, frame: t * 8 | 0, armDY: pat ? -((t * 6 | 0) % 2) * 2 : 0, blink: !walking && blinkAt(t), happy: t > 4.6 });
+  if (pat && (t * 6 | 0) % 2) { R(99, 60, 1, 1, YEL); R(100, 58, 1, 1, YEL); }
+  if (t > 4) for (let k = 0; k < 3; k++) { const tt = t - 4 - k * 0.4; if (tt > 0) heart(104 + k * 7, Math.round(44 - tt * 6), k === 1 ? '#F48FA6' : RED); }
+}
+
+function s8(t) { // 17:30 walk home
+  bands(0, 0, W, 72, ['#3F3566', '#6B4C7A', '#A65D7A', '#D9776A', '#F09A6B', '#F7C873']);
+  disc(124, 62, 10, '#FFE3A1');
+  const off = (t * 5) % 40;
+  for (let i = -1; i < 6; i++) { const bx = i * 40 - off, h = [22, 30, 18, 34, 26, 20, 28][(i + 1) % 7];
+    R(bx, 72 - h, 30, h, '#4A3A5C'); for (let wy = 72 - h + 4; wy < 68; wy += 6) for (let wx = bx + 4; wx < bx + 26; wx += 7) if ((wx * 7 + wy * 3 + i) % 5 < 2) R(wx, wy, 2, 2, '#F7C873'); }
+  const hx = Math.round(96 - t * 12);
+  R(hx, 26, 44, 46, '#E8E2D4'); R(hx, 26, 44, 3, '#CFC6B3');
+  R(hx + 17, 16, 10, 10, WHITE); R(hx + 21, 17, 2, 8, RED); R(hx + 18, 20, 8, 2, RED);
+  for (let wy = 32; wy < 62; wy += 8) for (let wx = hx + 4; wx < hx + 40; wx += 9) R(wx, wy, 5, 4, (wx + wy) % 3 ? '#8FB7C9' : '#F7C873');
+  R(hx + 17, 62, 10, 10, '#6A7A76');
+  R(0, 72, W, 18, '#5A4A62'); R(0, 72, W, 1, '#8A7A92');
+  const so = (t * 20) % 12; for (let i = -1; i < 15; i++) R(Math.round(i * 12 - so), 73, 1, 17, '#4C3E54');
+  clawd(64, 62, { walk: true, frame: t * 7 | 0, blink: blinkAt(t) });
+  R(77, 67 + ((t * 7 | 0) % 2), 4, 4, '#8C6A4F'); R(78, 66 + ((t * 7 | 0) % 2), 2, 1, '#6E5240');
+  const steps = Math.min(18000, 17810 + Math.floor(t * 34));
+  R(2, 2, 51, 9, 'rgba(20,16,32,0.55)'); txt('STEP ' + steps, 4, 4, WHITE);
+}
+
+function s9(t) { // 22:40 study, fall asleep
+  R(0, 0, W, 72, '#1F2440'); R(0, 72, W, 18, '#171B33');
+  R(110, 10, 38, 28, '#3A4270'); R(112, 12, 34, 24, '#141833');
+  disc(136, 20, 4, PAPER); disc(138, 19, 3, '#141833');
+  [[116, 16], [122, 28], [128, 14], [140, 30], [118, 32]].forEach(([sx, sy], i) => { if (((t * 2 + i) | 0) % 3) R(sx, sy, 1, 1, '#F7E9B0'); });
+  R(128, 12, 1, 24, '#3A4270'); R(112, 23, 34, 1, '#3A4270');
+  ctx.fillStyle = 'rgba(255,220,140,0.14)'; ctx.beginPath(); ctx.moveTo(46, 38); ctx.lineTo(54, 38); ctx.lineTo(104, 58); ctx.lineTo(30, 58); ctx.closePath(); ctx.fill();
+  const asleep = t > 3.6;
+  const nod = asleep ? 2 : (Math.sin(t * 4) > 0.6 && t > 1.2 ? 1 : 0);
+  clawd(72, 48 + nod, { blink: asleep || (t > 2.2 && (t * 3 % 1) < 0.5) || blinkAt(t) });
+  R(20, 58, 120, 3, '#6E5240'); R(20, 61, 120, 11, '#5A4234');
+  R(40, 55, 7, 3, '#E0B04C'); line(43, 55, 49, 38, '#C9A04A'); R(45, 34, 10, 4, '#E0B04C'); R(47, 38, 6, 1, '#FFE8A8');
+  R(64, 55, 15, 3, PAPER); R(81, 55, 15, 3, PAPER); R(79, 54, 2, 4, '#C9C2B0');
+  R(66, 56, 11, 1, '#B8B09C'); R(83, 56, 9, 1, '#B8B09C'); R(71, 54, 3, 1, RED);
+  R(102, 54, 8, 4, '#2E3440'); R(103, 55, 6, 2, '#3A4252');
+  if (asleep) for (let k = 0; k < 3; k++) { const tt = (t - 3.6 + k * 0.6) % 1.8; txt('Z', 88 + k * 4 + Math.round(tt * 2), Math.round(44 - tt * 8 - k * 2), '#BFC6E0'); }
+  if (t > 5) { const a = clamp01((t - 5) / 0.6); ctx.fillStyle = `rgba(10,12,24,${0.55 * a})`; ctx.fillRect(0, 0, W, H);
+    if (a > 0.5) { const s = 'GOOD NIGHT'; txt(s, Math.round((W - txtW(s)) / 2), 76, WHITE); heart(78, 83, RED); } }
+}
+
+const SCENES = [
+  { h: 6, m: 30, title: '起床', sub: '闹钟第三次响了……护理实习第 12 天，起床！', draw: s1 },
+  { h: 7, m: 20, title: '晨间交班', sub: '换好护士服，跟带教老师交班。床号、诊断、夜里有什么情况，全部记下来。', draw: s2 },
+  { h: 8, m: 0, title: '测生命体征', sub: '给 3 床爷爷测体温、脉搏、呼吸、血压。36.8℃，正常，记进体温单。', draw: s3 },
+  { h: 9, m: 30, title: '输液核对', sub: '输液前三查七对：床号、姓名、药名、剂量、浓度、时间、用法，一项都不能漏。', draw: s4 },
+  { h: 12, m: 10, title: '午饭', sub: '午饭 15 分钟解决。番茄炒蛋不错，刚吃两口，呼叫铃又响了。', draw: s5 },
+  { h: 14, m: 0, title: '护理记录', sub: '下午写护理记录。老师说：没记录的操作，就等于没做。', draw: s6 },
+  { h: 15, m: 30, title: '翻身拍背', sub: '帮 3 床爷爷翻身、拍背。他说“小护士手真稳”，今天值了。', draw: s7 },
+  { h: 17, m: 30, title: '下班', sub: '交完班下班。今天走了 18000 步，脚已经不是自己的了。', draw: s8 },
+  { h: 22, m: 40, title: '复习', sub: '复习明天要考的静脉输液操作……晚安，明天见。', draw: s9 },
+];
+const N = SCENES.length, TOTAL = N * DUR;
+const pad = n => String(n).padStart(2, '0');
+
+// ---------- UI ----------
+const $ = id => document.getElementById(id);
+const subEl = $('sub'), tcEl = $('tc'), recEl = $('rec'), recLabel = $('recLabel'), playBtn = $('play'), countEl = $('count'), chapNo = $('chapNo');
+const segs = [], chaps = [];
+SCENES.forEach((s, i) => {
+  const seg = document.createElement('button'); seg.type = 'button'; seg.className = 'seg'; seg.setAttribute('aria-label', `${pad(s.h)}:${pad(s.m)} ${s.title}`);
+  const fill = document.createElement('i'); seg.appendChild(fill); seg.onclick = () => seek(i); $('track').appendChild(seg); segs.push(fill);
+  const li = document.createElement('li'); const b = document.createElement('button'); b.type = 'button'; b.className = 'chap';
+  b.innerHTML = `<b>${pad(s.h)}:${pad(s.m)}</b><span>${s.title}</span>`; b.onclick = () => seek(i); li.appendChild(b); $('chapters').appendChild(li); chaps.push(b);
+});
+
+const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+let T = reduce ? 3.5 : 0, playing = !reduce, last = performance.now(), lastIdx = -1, lastSub = '';
+
+function setPlaying(p) {
+  playing = p;
+  playBtn.textContent = p ? '❚❚ 暂停' : '▶ 播放';
+  recEl.classList.toggle('paused', !p); recLabel.textContent = p ? 'REC' : 'PAUSE';
+  recEl.querySelector('.dot').classList.toggle('blink', p && !reduce);
+}
+function seek(i) { T = ((i % N + N) % N) * DUR + 0.001; lastSub = null; render(); }
+
+function render() {
+  const idx = Math.min(N - 1, Math.floor(T / DUR)), t = T - idx * DUR, s = SCENES[idx];
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
+  s.draw(t);
+  const fade = t < 0.35 ? 1 - t / 0.35 : t > DUR - 0.2 ? (t - (DUR - 0.2)) / 0.2 : 0;
+  if (fade > 0) { ctx.fillStyle = `rgba(0,0,0,${fade})`; ctx.fillRect(0, 0, W, H); }
+  const sec = Math.floor(t / DUR * 59);
+  tcEl.textContent = `${pad(s.h)}:${pad(s.m)}:${pad(sec)}`;
+  const shown = s.sub.slice(0, Math.max(0, Math.floor((t - 0.3) * 16)));
+  if (shown !== lastSub) { subEl.textContent = shown; lastSub = shown; }
+  segs.forEach((f, i) => f.style.width = i < idx ? '100%' : i === idx ? (t / DUR * 100).toFixed(1) + '%' : '0');
+  if (idx !== lastIdx) {
+    chaps.forEach((c, i) => c.setAttribute('aria-current', i === idx ? 'true' : 'false'));
+    countEl.textContent = `${pad(idx + 1)} / ${pad(N)}`; chapNo.textContent = `${pad(idx + 1)}/${pad(N)}`;
+    cv.setAttribute('aria-label', `像素动画：${pad(s.h)}:${pad(s.m)} ${s.title}。${s.sub}`);
+    lastIdx = idx;
+  }
+}
+function loop(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  if (playing) { T = (T + dt) % TOTAL; render(); }
+  requestAnimationFrame(loop);
+}
+const cur = () => Math.floor(T / DUR);
+playBtn.onclick = () => setPlaying(!playing);
+$('prev').onclick = () => seek(cur() - 1);
+$('next').onclick = () => seek(cur() + 1);
+cv.addEventListener('click', () => setPlaying(!playing));
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (e.key === ' ' && tag !== 'button' && tag !== 'input') { e.preventDefault(); setPlaying(!playing); }
+  else if (e.key === 'ArrowLeft') seek(cur() - 1);
+  else if (e.key === 'ArrowRight') seek(cur() + 1);
+});
+setPlaying(playing);
+render();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
